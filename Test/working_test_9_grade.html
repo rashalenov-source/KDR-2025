@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест по информатике - 9 класс</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .header { background: linear-gradient(135deg, #ff6b6b, #ffd93d); padding: 30px; text-align: center; color: white; }
+        h1 { margin: 0; font-size: 2em; }
+        .subtitle { margin-top: 10px; opacity: 0.9; }
+        .form, .content { padding: 30px; }
+        .form { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); text-align: center; }
+        .form-group { margin: 20px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"] { padding: 10px; border: 2px solid #ddd; border-radius: 20px; width: 200px; text-align: center; }
+        button { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 12px 30px; border-radius: 20px; cursor: pointer; font-size: 16px; margin: 10px; }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .question { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; margin: 20px 0; border-radius: 10px; }
+        .question h3 { margin: 0 0 15px 0; }
+        .options { display: grid; gap: 10px; }
+        .option { background: rgba(255,255,255,0.2); padding: 10px; border-radius: 8px; cursor: pointer; }
+        .option:hover { background: rgba(255,255,255,0.3); }
+        .nav { display: flex; justify-content: space-between; align-items: center; padding: 20px; background: #f5f5f5; }
+        .progress { height: 6px; background: #ddd; margin: 20px 0; border-radius: 3px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #ff6b6b, #ffd93d); border-radius: 3px; transition: width 0.3s; }
+        .results { padding: 30px; text-align: center; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); }
+        .score { font-size: 2.5em; font-weight: bold; margin: 20px 0; }
+        .grade { padding: 10px 20px; border-radius: 20px; font-weight: bold; margin: 10px; }
+        .grade-5 { background: #4CAF50; color: white; }
+        .grade-4 { background: #2196F3; color: white; }
+        .grade-3 { background: #FF9800; color: white; }
+        .grade-2 { background: #F44336; color: white; }
+        .hidden { display: none; }
+        .error { background: #ffebee; border: 1px solid #e57373; color: #c62828; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Контрольный тест по информатике</h1>
+            <div class="subtitle">9 класс • 25 вопросов</div>
+        </div>
+
+        <div id="loginForm" class="form">
+            <div class="form-group">
+                <label>Фамилия:</label>
+                <input type="text" id="lastName">
+            </div>
+            <div class="form-group">
+                <label>Имя:</label>
+                <input type="text" id="firstName">
+            </div>
+            <button onclick="startTest()">Начать тест</button>
+            <div id="error" class="error hidden">Заполните все поля</div>
+        </div>
+
+        <div id="testArea" class="hidden">
+            <div class="content">
+                <div class="progress">
+                    <div class="progress-fill" id="progress"></div>
+                </div>
+                <div id="questionArea"></div>
+            </div>
+            
+            <div class="nav">
+                <button id="prevBtn" onclick="prevQ()" disabled>← Назад</button>
+                <span>Вопрос <span id="qNum">1</span> из 25</span>
+                <button id="nextBtn" onclick="nextQ()">Вперед →</button>
+                <button id="finishBtn" onclick="finish()" class="hidden">Завершить</button>
+            </div>
+        </div>
+
+        <div id="results" class="results hidden">
+            <h2 id="studentName"></h2>
+            <div class="score" id="scoreDisplay"></div>
+            <div class="grade" id="gradeDisplay"></div>
+            <div id="feedback"></div>
+            <div id="details"></div>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            {q: "Какое свойство НЕ относится к информации?", o: ["Актуальность", "Точность", "Размер файла", "Достоверность"], a: 2, g: "9.2.1.1"},
+            {q: "Что происходит при долгой работе за ПК?", o: ["Улучшение зрения", "Усталость глаз", "Рост иммунитета", "Рост организма"], a: 1, g: "9.4.1.1"},
+            {q: "Что такое облачные технологии?", o: ["Изучение погоды", "Удаленное хранение данных", "Рисование облаков", "Полеты в облаках"], a: 1, g: "9.1.3.1"},
+            {q: "К чему ведет нарушение сетевого этикета?", o: ["Лучшие отношения", "Конфликты и проблемы", "Быстрый интернет", "Экономия трафика"], a: 1, g: "9.4.2.1"},
+            {q: "Что важно для игрового ПК?", o: ["Мощная видеокарта", "Большой монитор", "Много USB", "Красивый корпус"], a: 0, g: "9.1.1.1"},
+            {q: "Программа для работы с текстом?", o: ["Фотошоп", "Word/Блокнот", "Антивирус", "Браузер"], a: 1, g: "9.1.2.1"},
+            {q: "Что такое база данных?", o: ["Игра", "Хранилище информации", "Операционка", "Файл"], a: 1, g: "9.2.2.1"},
+            {q: "Что такое 'запись' в БД?", o: ["Строка с данными", "Столбец", "Название", "Размер"], a: 0, g: "9.2.2.1"},
+            {q: "Где создать простую БД?", o: ["Блокнот", "Excel", "Фотошоп", "Браузер"], a: 1, g: "9.2.2.2"},
+            {q: "Что такое сортировка?", o: ["Удаление", "Упорядочивание", "Копирование", "Шифрование"], a: 1, g: "9.2.2.3"},
+            {q: "Что такое фильтрация?", o: ["Очистка экрана", "Отбор по условию", "Сжатие", "Копирование"], a: 1, g: "9.2.2.3"},
+            {q: "Расширение файлов Python?", o: [".txt", ".py", ".exe", ".doc"], a: 1, g: "9.3.3.1"},
+            {q: "Как создать массив в Python?", o: ["array = []", "list = ()", "arr = {}", "arr = ||"], a: 0, g: "9.3.3.1"},
+            {q: "Длина массива в Python?", o: ["size()", "len()", "length", "count()"], a: 1, g: "9.3.3.1"},
+            {q: "Что такое 2D массив?", o: ["2 элемента", "Таблица", "Только числа", "Только текст"], a: 1, g: "9.3.3.2"},
+            {q: "Простейшая сортировка?", o: ["Быстрая", "Пузырьком", "Слиянием", "Пирамидой"], a: 1, g: "9.3.2.1"},
+            {q: "Для чего PyGame?", o: ["Веб-сайты", "Игры", "Базы данных", "Фото"], a: 1, g: "9.3.3.3"},
+            {q: "Подключение PyGame?", o: ["import pygame", "include pygame", "using pygame", "add pygame"], a: 0, g: "9.3.3.3"},
+            {q: "pygame.display.set_mode() для?", o: ["Картинки", "Окно игры", "Звук", "Сохранение"], a: 1, g: "9.3.3.4"},
+            {q: "Что такое спрайт?", o: ["Звук", "Графика персонажа", "Сложность", "Размер экрана"], a: 1, g: "9.3.3.6"},
+            {q: "Как создать фон в PyGame?", o: ["background()", "screen.fill()", "pygame.bg()", "set_bg()"], a: 1, g: "9.3.3.5"},
+            {q: "Для анимации нужно?", o: ["Менять координаты", "Новый персонаж", "Менять фон", "Громче звук"], a: 0, g: "9.3.3.7"},
+            {q: "Что такое game loop?", o: ["Конец игры", "Цикл обновления", "Загрузка", "Сохранение"], a: 1, g: "9.3.3.9"},
+            {q: "Зачем счет в игре?", o: ["Красота", "Прогресс игрока", "Скорость", "Графика"], a: 1, g: "9.3.3.10"},
+            {q: "Плюс облачной работы?", o: ["Красивее", "Совместное редактирование", "Меньше места", "Защита"], a: 1, g: "9.1.3.1"}
+        ];
+
+        let currentQ = 0;
+        let answers = {};
+        let student = "";
+        let startTime = new Date();
+
+        function startTest() {
+            const ln = document.getElementById('lastName').value.trim();
+            const fn = document.getElementById('firstName').value.trim();
+            
+            if (!ln || !fn) {
+                document.getElementById('error').classList.remove('hidden');
+                return;
+            }
+            
+            student = ln + ' ' + fn;
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('testArea').classList.remove('hidden');
+            
+            shuffle();
+            showQ();
+        }
+
+        function shuffle() {
+            questions.forEach(q => {
+                const correct = q.o[q.a];
+                for (let i = q.o.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [q.o[i], q.o[j]] = [q.o[j], q.o[i]];
+                }
+                q.a = q.o.indexOf(correct);
+            });
+        }
+
+        function showQ() {
+            const q = questions[currentQ];
+            let html = '<div class="question"><h3>' + (currentQ + 1) + '. ' + q.q + '</h3>';
+            
+            for (let i = 0; i < q.o.length; i++) {
+                const checked = answers[currentQ] === i ? 'checked' : '';
+                html += '<label class="option"><input type="radio" name="q" value="' + i + '" ' + checked + ' onchange="answer(' + i + ')">' + q.o[i] + '</label>';
+            }
+            
+            html += '</div>';
+            document.getElementById('questionArea').innerHTML = html;
+            document.getElementById('qNum').textContent = currentQ + 1;
+            document.getElementById('progress').style.width = ((currentQ + 1) / 25 * 100) + '%';
+            
+            document.getElementById('prevBtn').disabled = currentQ === 0;
+            document.getElementById('nextBtn').classList.toggle('hidden', currentQ === 24);
+            document.getElementById('finishBtn').classList.toggle('hidden', currentQ !== 24);
+        }
+
+        function answer(val) {
+            answers[currentQ] = val;
+        }
+
+        function nextQ() {
+            if (currentQ < 24) {
+                currentQ++;
+                showQ();
+            }
+        }
+
+        function prevQ() {
+            if (currentQ > 0) {
+                currentQ--;
+                showQ();
+            }
+        }
+
+        function finish() {
+            if (!confirm('Завершить тест?')) return;
+            
+            let correct = 0;
+            let missed = [];
+            
+            for (let i = 0; i < 25; i++) {
+                if (answers[i] === questions[i].a) {
+                    correct++;
+                } else {
+                    missed.push(questions[i].g);
+                }
+            }
+            
+            const pct = Math.round(correct / 25 * 100);
+            const time = Math.round((new Date() - startTime) / 60000);
+            
+            let grade, gradeClass;
+            if (pct >= 85) { grade = "Отлично (5)"; gradeClass = "grade-5"; }
+            else if (pct >= 70) { grade = "Хорошо (4)"; gradeClass = "grade-4"; }
+            else if (pct >= 50) { grade = "Удовлетворительно (3)"; gradeClass = "grade-3"; }
+            else { grade = "Неудовлетворительно (2)"; gradeClass = "grade-2"; }
+            
+            document.getElementById('testArea').classList.add('hidden');
+            document.getElementById('results').classList.remove('hidden');
+            
+            document.getElementById('studentName').textContent = student;
+            document.getElementById('scoreDisplay').textContent = correct + '/25 (' + pct + '%)';
+            document.getElementById('gradeDisplay').textContent = grade;
+            document.getElementById('gradeDisplay').className = 'grade ' + gradeClass;
+            
+            let feedback = pct >= 85 ? 'Отличный результат!' : 
+                          pct >= 70 ? 'Хороший результат!' : 
+                          pct >= 50 ? 'Нужно подучить материал.' : 'Требуется повторить весь курс.';
+            
+            document.getElementById('feedback').textContent = feedback + ' Время: ' + time + ' мин.';
+            
+            if (missed.length > 0) {
+                document.getElementById('details').innerHTML = '<p><strong>Пропущенные цели:</strong> ' + missed.join(', ') + '</p>';
+            }
+            
+            console.log('Результат:', {student, correct, pct, time, missed});
+        }
+    </script>
+</body>
+</html>
