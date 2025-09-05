@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Контрольный тест по информатике - 9 класс</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Контрольный тест по информатике</h1>
+            <div class="subtitle">9 класс • 25 вопросов • Одна попытка</div>
+        </div>
+
+        <div id="loginForm" class="login-form">
+            <div class="form-group">
+                <label for="lastName">Фамилия:</label>
+                <input type="text" id="lastName" required>
+            </div>
+            <div class="form-group">
+                <label for="firstName">Имя:</label>
+                <input type="text" id="firstName" required>
+            </div>
+            <div class="form-group">
+                <label for="studentClass">Класс:</label>
+                <input type="text" id="studentClass" placeholder="9А, 9Б и т.д." required>
+            </div>
+            <button class="start-btn" onclick="startTest()">Начать тест</button>
+            <div id="loginError" class="error-message">
+                Пожалуйста, заполните все поля
+            </div>
+        </div>
+
+        <div id="quizContainer" class="question-container">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar"></div>
+            </div>
+            
+            <div id="questionContent"></div>
+        </div>
+
+        <div id="navigation" class="navigation" style="display: none;">
+            <button class="nav-btn" id="prevBtn" onclick="previousQuestion()">← Предыдущий</button>
+            <div class="question-info">
+                <span id="currentQuestion">1</span> из <span id="totalQuestions">25</span>
+            </div>
+            <button class="nav-btn" id="nextBtn" onclick="nextQuestion()">Следующий →</button>
+        </div>
+
+        <div id="submitContainer" class="submit-container">
+            <div class="warning-message">
+                Внимание! После отправки теста изменить ответы будет невозможно.
+            </div>
+            <button class="submit-btn" onclick="finishTest()">Завершить тест</button>
+        </div>
+
+        <div id="results" class="results">
+            <div id="sending" class="sending-message hidden">Отправка результатов...</div>
+            <div id="success" class="success-message hidden"></div>
+            <div id="firebaseError" class="error-message hidden"></div>
+            
+            <div class="student-info">
+                <h3 id="studentName"></h3>
+            </div>
+            <div class="score" id="score"></div>
+            <div class="grade-badge" id="gradeBadge"></div>
+            <div class="feedback" id="feedback"></div>
+            <div class="result-summary" id="resultSummary"></div>
+            <div class="details" id="details"></div>
+        </div>
+    </div>
+
+    <script>
+        // Конфигурация Firebase (ЗАМЕНИТЕ НА ВАШУ)
+        window.firebaseConfig = {
+            apiKey: "AIzaSyCaloJFtBuVT-RCz8wyTKjhIFSiOyjW7vI",
+    authDomain: "school13zar.firebaseapp.com",
+    projectId: "school13zar",
+    storageBucket: "school13zar.firebasestorage.app",
+    messagingSenderId: "567148623030",
+    appId: "1:567148623030:web:6ddac6fb7aa4c8429ea217"
+        };
+
+        // Данные вопросов для 9 класса
+        const questions = [
+            {
+                id: 1,
+                text: "Какое из перечисленных свойств НЕ относится к свойствам информации?",
+                options: ["Актуальность", "Точность", "Размер файла", "Достоверность"],
+                correct: 2,
+                goal: "9.2.1.1"
+            },
+            {
+                id: 2,
+                text: "Что может произойти при продолжительном использовании компьютера?",
+                options: ["Улучшение зрения", "Усталость глаз и нарушение осанки", "Повышение иммунитета", "Увеличение роста"],
+                correct: 1,
+                goal: "9.4.1.1"
+            },
+            {
+                id: 3,
+                text: "Что такое облачные технологии?",
+                options: ["Технологии изучения погоды", "Удаленное хранение и обработка данных через интернет", "Программы для рисования облаков", "Технологии полета в облаках"],
+                correct: 1,
+                goal: "9.1.3.1"
+            },
+            {
+                id: 4,
+                text: "К чему может привести нарушение сетевого этикета?",
+                options: ["К улучшению отношений", "К конфликтам и правовым последствиям", "К повышению скорости интернета", "К экономии трафика"],
+                correct: 1,
+                goal: "9.4.2.1"
+            },
+            {
+                id: 5,
+                text: "При выборе конфигурации компьютера для игр наиболее важны:",
+                options: ["Мощная видеокарта и процессор", "Большой монитор", "Много USB-портов", "Красивый корпус"],
+                correct: 0,
+                goal: "9.1.1.1"
+            },
+            {
+                id: 6,
+                text: "Какой тип программного обеспечения нужен для работы с текстом?",
+                options: ["Графический редактор", "Текстовый редактор", "Антивирус", "Браузер"],
+                correct: 1,
+                goal: "9.1.2.1"
+            },
+            {
+                id: 7,
+                text: "Что такое база данных?",
+                options: ["Программа для игр", "Организованное хранилище информации", "Операционная система", "Тип файла"],
+                correct: 1,
+                goal: "9.2.2.1"
+            },
+            {
+                id: 8,
+                text: "Что такое 'запись' в базе данных?",
+                options: ["Строка таблицы с информацией об одном объекте", "Столбец таблицы", "Название таблицы", "Размер базы данных"],
+                correct: 0,
+                goal: "9.2.2.1"
+            },
+            {
+                id: 9,
+                text: "В какой программе удобнее всего создать простую базу данных?",
+                options: ["В блокноте", "В электронной таблице", "В графическом редакторе", "В браузере"],
+                correct: 1,
+                goal: "9.2.2.2"
+            },
+            {
+                id: 10,
+                text: "Что означает 'сортировка данных'?",
+                options: ["Удаление данных", "Упорядочивание данных по определенному критерию", "Копирование данных", "Шифрование данных"],
+                correct: 1,
+                goal: "9.2.2.3"
+            },
+            {
+                id: 11,
+                text: "Что такое 'фильтрация данных'?",
+                options: ["Очистка экрана", "Отбор данных по заданным условиям", "Сжатие файлов", "Резервное копирование"],
+                correct: 1,
+                goal: "9.2.2.3"
+            },
+            {
+                id: 12,
+                text: "Какое расширение имеют файлы программ на Python?",
+                options: [".txt", ".py", ".exe", ".doc"],
+                correct: 1,
+                goal: "9.3.3.1"
+            },
+            {
+                id: 13,
+                text: "Как объявить одномерный массив в Python?",
+                options: ["array = []", "list = ()", "массив = {}", "arr = |1,2,3|"],
+                correct: 0,
+                goal: "9.3.3.1"
+            },
+            {
+                id: 14,
+                text: "Как получить длину массива в Python?",
+                options: ["array.size()", "len(array)", "array.length", "count(array)"],
+                correct: 1,
+                goal: "9.3.3.1"
+            },
+            {
+                id: 15,
+                text: "Что такое двумерный массив?",
+                options: ["Массив из двух элементов", "Массив массивов (таблица)", "Массив только с числами", "Массив только со строками"],
+                correct: 1,
+                goal: "9.3.3.2"
+            },
+            {
+                id: 16,
+                text: "Какой алгоритм сортировки самый простой для понимания?",
+                options: ["Быстрая сортировка", "Сортировка пузырьком", "Сортировка слиянием", "Пирамидальная сортировка"],
+                correct: 1,
+                goal: "9.3.2.1"
+            },
+            {
+                id: 17,
+                text: "Что делает библиотека PyGame?",
+                options: ["Создает веб-сайты", "Позволяет создавать игры", "Работает с базами данных", "Редактирует изображения"],
+                correct: 1,
+                goal: "9.3.3.3"
+            },
+            {
+                id: 18,
+                text: "Какая команда подключает библиотеку PyGame в Python?",
+                options: ["import pygame", "include pygame", "using pygame", "add pygame"],
+                correct: 0,
+                goal: "9.3.3.3"
+            },
+            {
+                id: 19,
+                text: "Для чего используется pygame.display.set_mode()?",
+                options: ["Для загрузки изображений", "Для создания игрового окна", "Для воспроизведения звука", "Для сохранения игры"],
+                correct: 1,
+                goal: "9.3.3.4"
+            },
+            {
+                id: 20,
+                text: "Что такое спрайт в игре?",
+                options: ["Звуковой эффект", "Графический объект (персонаж, предмет)", "Уровень сложности", "Размер экрана"],
+                correct: 1,
+                goal: "9.3.3.6"
+            },
+            {
+                id: 21,
+                text: "Как создать задний фон в PyGame?",
+                options: ["background.create()", "screen.fill(color) или загрузить изображение", "pygame.background()", "set_background(image)"],
+                correct: 1,
+                goal: "9.3.3.5"
+            },
+            {
+                id: 22,
+                text: "Что нужно для анимации персонажа в игре?",
+                options: ["Изменение его координат в цикле игры", "Создание нового персонажа", "Изменение цвета фона", "Увеличение громкости звука"],
+                correct: 0,
+                goal: "9.3.3.7"
+            },
+            {
+                id: 23,
+                text: "Что такое игровой цикл (game loop)?",
+                options: ["Окончание игры", "Постоянно повторяющийся процесс обновления игры", "Загрузка игры", "Сохранение результатов"],
+                correct: 1,
+                goal: "9.3.3.9"
+            },
+            {
+                id: 24,
+                text: "Для чего нужен подсчет очков в игре?",
+                options: ["Для украшения экрана", "Для отслеживания прогресса игрока", "Для ускорения игры", "Для изменения графики"],
+                correct: 1,
+                goal: "9.3.3.10"
+            },
+            {
+                id: 25,
+                text: "Какое преимущество дает совместная работа с документами в облаке?",
+                options: ["Документы становятся красивее", "Несколько человек могут редактировать одновременно", "Документы занимают меньше места", "Документы лучше защищены от вирусов"],
+                correct: 1,
+                goal: "9.1.3.1"
+            }
+        ];
+
+        // Инициализация теста после загрузки скрипта
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof initTest === 'function') {
+                window.testEngine = initTest(questions, {
+                    subject: 'Информатика',
+                    grade: '9 класс',
+                    passingScore: 50
+                });
+            } else {
+                console.error('Не удалось загрузить test-engine.js');
+            }
+        });
+    </script>
+    <script src="test-engine.js"></script>
+</body>
+</html>
