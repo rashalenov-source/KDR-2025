@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tower Defense - Защити базу!</title>
+    <link rel="stylesheet" href="tower-defense.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>🏰 Tower Defense</h1>
+            <button id="backBtn" class="back-btn">← Назад на главную</button>
+        </div>
+
+        <div class="game-stats">
+            <div class="stat-item">
+                <span class="stat-label">💰 Деньги:</span>
+                <span id="money" class="stat-value">200</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">❤️ Жизни:</span>
+                <span id="lives" class="stat-value">20</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">🌊 Волна:</span>
+                <span id="wave" class="stat-value">1</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">👾 Врагов:</span>
+                <span id="enemies" class="stat-value">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">📊 Счёт:</span>
+                <span id="score" class="stat-value">0</span>
+            </div>
+        </div>
+
+        <div class="game-main">
+            <div class="game-canvas-wrapper">
+                <canvas id="gameCanvas" width="800" height="600"></canvas>
+                <div id="gameOverlay" class="game-overlay hidden">
+                    <div class="overlay-content">
+                        <h2 id="overlayTitle">Игра окончена!</h2>
+                        <p id="overlayMessage">Вы защитили базу!</p>
+                        <p id="overlayScore">Счёт: 0</p>
+                        <button id="restartBtn" class="game-btn">Начать заново</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tower-panel">
+                <h3>Башни</h3>
+                <div class="tower-list">
+                    <div class="tower-card" data-tower="basic">
+                        <div class="tower-icon">🎯</div>
+                        <div class="tower-info">
+                            <div class="tower-name">Базовая</div>
+                            <div class="tower-stats">
+                                <div>💰 50</div>
+                                <div>💥 10 урона</div>
+                                <div>📏 120 дальность</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tower-card" data-tower="sniper">
+                        <div class="tower-icon">🎪</div>
+                        <div class="tower-info">
+                            <div class="tower-name">Снайпер</div>
+                            <div class="tower-stats">
+                                <div>💰 100</div>
+                                <div>💥 50 урона</div>
+                                <div>📏 200 дальность</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tower-card" data-tower="cannon">
+                        <div class="tower-icon">💣</div>
+                        <div class="tower-info">
+                            <div class="tower-name">Пушка</div>
+                            <div class="tower-stats">
+                                <div>💰 150</div>
+                                <div>💥 30 урона (AOE)</div>
+                                <div>📏 100 дальность</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tower-card" data-tower="freeze">
+                        <div class="tower-icon">❄️</div>
+                        <div class="tower-info">
+                            <div class="tower-name">Заморозка</div>
+                            <div class="tower-stats">
+                                <div>💰 120</div>
+                                <div>❄️ замедление</div>
+                                <div>📏 150 дальность</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tower-actions">
+                    <button id="sellTowerBtn" class="action-btn" disabled>
+                        💵 Продать (50%)
+                    </button>
+                    <button id="upgradeTowerBtn" class="action-btn" disabled>
+                        ⬆️ Улучшить
+                    </button>
+                </div>
+
+                <div class="game-controls">
+                    <button id="startWaveBtn" class="game-btn primary">
+                        ▶️ Начать волну
+                    </button>
+                    <button id="pauseBtn" class="game-btn">
+                        ⏸️ Пауза
+                    </button>
+                    <button id="speedBtn" class="game-btn" data-speed="1">
+                        ⏩ x1
+                    </button>
+                </div>
+
+                <div class="game-info">
+                    <h4>Инструкция:</h4>
+                    <ul>
+                        <li>Выберите башню из списка</li>
+                        <li>Кликните на свободную клетку</li>
+                        <li>Не стройте на пути врагов!</li>
+                        <li>Защитите базу от всех волн</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="tower-defense.js"></script>
+</body>
+</html>
