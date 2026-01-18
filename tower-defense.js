@@ -169,7 +169,7 @@ class PathFinder {
             // DPS башни
             const dps = damage / (fireRate / 1000);
 
-            const rangeInCells = Math.ceil((range + 20) / GRID_SIZE); // +20 для большего отступа
+            const rangeInCells = Math.ceil((range + 40) / GRID_SIZE); // +40 для большего отступа
 
             for (let dx = -rangeInCells; dx <= rangeInCells; dx++) {
                 for (let dy = -rangeInCells; dy <= rangeInCells; dy++) {
@@ -181,8 +181,20 @@ class PathFinder {
 
                         if (dist <= range) {
                             const key = `${x},${y}`;
-                            // Чем ближе к башне и чем выше DPS, тем опаснее
-                            const dangerFromTower = (1 - (dist / range)) * dps * 50;
+
+                            // Нормализованное расстояние (0 = в центре, 1 = на краю)
+                            const normalizedDist = dist / range;
+
+                            // Экспоненциальная опасность: чем ближе к башне, тем НАМНОГО опаснее
+                            // Используем квадратичную функцию для резкого роста опасности
+                            const distanceFactor = Math.pow(1 - normalizedDist, 3);
+
+                            // Базовая опасность зависит от DPS
+                            const baseDanger = dps * 300;
+
+                            // Итоговая опасность
+                            const dangerFromTower = distanceFactor * baseDanger;
+
                             map[key] = (map[key] || 0) + dangerFromTower;
                         }
                     }
@@ -235,10 +247,17 @@ class PathFinder {
 
                 if (closedSet.has(neighborKey)) continue;
 
-                // Стоимость движения = расстояние + опасность от башен
+                // Стоимость движения = базовое расстояние * (1 + опасность)
+                // Опасность теперь множитель, а не сложение
                 const danger = this.dangerMap[neighborKey] || 0;
                 const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
-                const moveCost = baseCost + danger;
+
+                // Чем выше опасность, тем больше множитель
+                // Если danger = 0, moveCost = baseCost
+                // Если danger = 100, moveCost = baseCost * 11 (в 11 раз дороже)
+                // Если danger = 1000, moveCost = baseCost * 101 (в 101 раз дороже)
+                const dangerMultiplier = 1 + (danger / 10);
+                const moveCost = baseCost * dangerMultiplier;
 
                 const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
 
