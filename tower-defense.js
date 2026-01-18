@@ -247,17 +247,16 @@ class PathFinder {
 
                 if (closedSet.has(neighborKey)) continue;
 
-                // Стоимость движения = базовое расстояние * (1 + опасность)
-                // Опасность теперь ДОМИНИРУЮЩИЙ множитель
+                // Стоимость движения с ЭКСПОНЕНЦИАЛЬНЫМ ростом опасности
                 const danger = this.dangerMap[neighborKey] || 0;
                 const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
 
-                // Чем выше опасность, тем НАМНОГО больше множитель
-                // Если danger = 0, moveCost = baseCost
-                // Если danger = 100, moveCost = baseCost * 51 (в 51 раз дороже!)
-                // Если danger = 1000, moveCost = baseCost * 501 (в 501 раз дороже!)
-                // Если danger = 10000, moveCost = baseCost * 5001 (в 5001 раз дороже!)
-                const dangerMultiplier = 1 + (danger / 2);
+                // ЭКСПОНЕНЦИАЛЬНЫЙ множитель - делает опасные клетки почти непроходимыми!
+                // Если danger = 0, множитель = 1 (обычная стоимость)
+                // Если danger = 500, множитель = e^1 ≈ 2.7
+                // Если danger = 1500, множитель = e^3 ≈ 20
+                // Если danger = 5000, множитель = e^10 ≈ 22000 (НЕВЕРОЯТНО ДОРОГО!)
+                const dangerMultiplier = Math.exp(danger / 500);
                 const moveCost = baseCost * dangerMultiplier;
 
                 const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
