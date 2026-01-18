@@ -3,6 +3,7 @@ const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
 const AUTO_WAVE_DELAY = 7000; // 7 секунд
+const PATH_RECALC_INTERVAL = 100; // Пересчет пути каждые 100мс
 
 // Стартовая и конечная точки
 const START_POINT = { x: 0, y: 7 };
@@ -94,6 +95,16 @@ const ENEMY_TYPES = {
         shape: 'square',
         size: 20,
         hasShield: true
+    },
+    scout: {
+        name: 'Разведчик',
+        health: 20,
+        speed: 3.0,
+        reward: 8,
+        color: '#00E676',
+        shape: 'triangle',
+        size: 10,
+        isScout: true
     }
 };
 
@@ -131,10 +142,13 @@ for (let i = 0; i < 15; i++) {
         );
     }
 
+    // Добавляем 4 разведчика в середину волны
+    wave.scoutCount = 4;
+
     WAVES.push(wave);
 }
 
-// A* pathfinding с учетом башен
+// A* pathfinding с агрессивным избеганием башен
 class PathFinder {
     constructor(gridCols, gridRows, towers) {
         this.gridCols = gridCols;
@@ -149,7 +163,13 @@ class PathFinder {
         this.towers.forEach(tower => {
             const type = TOWER_TYPES[tower.type];
             const range = type.range * (1 + (tower.rangeLevel - 1) * 0.2);
-            const rangeInCells = Math.ceil(range / GRID_SIZE);
+            const damage = type.damage * (1 + (tower.damageLevel - 1) * 0.3);
+            const fireRate = type.fireRate / (1 + (tower.speedLevel - 1) * 0.15);
+
+            // DPS башни
+            const dps = damage / (fireRate / 1000);
+
+            const rangeInCells = Math.ceil((range + 20) / GRID_SIZE); // +20 для большего отступа
 
             for (let dx = -rangeInCells; dx <= rangeInCells; dx++) {
                 for (let dy = -rangeInCells; dy <= rangeInCells; dy++) {
@@ -158,10 +178,12 @@ class PathFinder {
 
                     if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
                         const dist = Math.sqrt(dx * dx + dy * dy) * GRID_SIZE;
+
                         if (dist <= range) {
                             const key = `${x},${y}`;
-                            const danger = 1 - (dist / range); // Чем ближе к башне, тем опаснее
-                            map[key] = (map[key] || 0) + danger * 10;
+                            // Чем ближе к башне и чем выше DPS, тем опаснее
+                            const dangerFromTower = (1 - (dist / range)) * dps * 50;
+                            map[key] = (map[key] || 0) + dangerFromTower;
                         }
                     }
                 }
@@ -171,7 +193,12 @@ class PathFinder {
         return map;
     }
 
-    findPath(start, end) {
+    findPath(start, end, isScout = false) {
+        // Разведчики идут случайным путем
+        if (isScout) {
+            return this.findRandomPath(start, end);
+        }
+
         const openSet = [];
         const closedSet = new Set();
         const cameFrom = new Map();
@@ -208,9 +235,10 @@ class PathFinder {
 
                 if (closedSet.has(neighborKey)) continue;
 
-                // Добавляем стоимость опасности от башен
+                // Стоимость движения = расстояние + опасность от башен
                 const danger = this.dangerMap[neighborKey] || 0;
-                const moveCost = 1 + danger;
+                const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
+                const moveCost = baseCost + danger;
 
                 const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
 
@@ -227,6 +255,57 @@ class PathFinder {
         }
 
         return null;
+    }
+
+    findRandomPath(start, end) {
+        // Случайный путь для разведчиков
+        const path = [start];
+        let current = { ...start };
+        const visited = new Set();
+        visited.add(`${start.x},${start.y}`);
+
+        while (current.x !== end.x || current.y !== end.y) {
+            const neighbors = this.getNeighbors(current).filter(n => {
+                const key = `${n.x},${n.y}`;
+                return !visited.has(key);
+            });
+
+            if (neighbors.length === 0) {
+                // Тупик - идем к цели напрямую
+                const allNeighbors = this.getNeighbors(current);
+                if (allNeighbors.length === 0) break;
+
+                // Выбираем ближайшего к цели
+                current = allNeighbors.reduce((closest, n) => {
+                    const distN = Math.abs(n.x - end.x) + Math.abs(n.y - end.y);
+                    const distClosest = Math.abs(closest.x - end.x) + Math.abs(closest.y - end.y);
+                    return distN < distClosest ? n : closest;
+                });
+            } else {
+                // Случайный сосед с небольшим bias к цели
+                if (Math.random() < 0.3) {
+                    // 30% шанс идти к цели
+                    current = neighbors.reduce((closest, n) => {
+                        const distN = Math.abs(n.x - end.x) + Math.abs(n.y - end.y);
+                        const distClosest = Math.abs(closest.x - end.x) + Math.abs(closest.y - end.y);
+                        return distN < distClosest ? n : closest;
+                    });
+                } else {
+                    // 70% шанс случайное направление
+                    current = neighbors[Math.floor(Math.random() * neighbors.length)];
+                }
+            }
+
+            visited.add(`${current.x},${current.y}`);
+            path.push({ ...current });
+
+            // Защита от бесконечного цикла
+            if (path.length > this.gridCols * this.gridRows) {
+                break;
+            }
+        }
+
+        return path;
     }
 
     getNeighbors(node) {
@@ -300,6 +379,7 @@ class Game {
         this.currentPath = null;
 
         this.upgradeButtons = [];
+        this.lastPathRecalc = 0;
 
         this.initEventListeners();
         this.gameLoop();
@@ -483,7 +563,7 @@ class Game {
         if ((gridX === START_POINT.x && gridY === START_POINT.y) ||
             (gridX === END_POINT.x && gridY === END_POINT.y)) return;
 
-        const testTowers = [...this.towers, { gridX, gridY, type: this.selectedTowerType, rangeLevel: 1 }];
+        const testTowers = [...this.towers, { gridX, gridY, type: this.selectedTowerType, rangeLevel: 1, damageLevel: 1, speedLevel: 1 }];
         const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, testTowers);
         const testPath = pathFinder.findPath(START_POINT, END_POINT);
 
@@ -590,14 +670,9 @@ class Game {
         }
     }
 
-    calculatePath() {
+    calculatePath(isScout = false) {
         const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, this.towers);
-        this.currentPath = pathFinder.findPath(START_POINT, END_POINT);
-
-        if (!this.currentPath) {
-            console.error('Путь не найден!');
-            this.currentPath = [START_POINT, END_POINT];
-        }
+        return pathFinder.findPath(START_POINT, END_POINT, isScout);
     }
 
     startWave() {
@@ -612,7 +687,7 @@ class Game {
         this.waveInProgress = true;
         this.wave++;
 
-        this.calculatePath();
+        this.currentPath = this.calculatePath();
 
         this.spawnWave();
         this.updateUI();
@@ -622,6 +697,7 @@ class Game {
         const waveConfig = WAVES[this.wave - 1];
         let delay = 0;
 
+        // Спавним обычных врагов
         waveConfig.enemies.forEach(({ type, count }) => {
             for (let i = 0; i < count; i++) {
                 setTimeout(() => {
@@ -632,10 +708,21 @@ class Game {
                 delay += 0.8;
             }
         });
+
+        // Спавним разведчиков в середине волны
+        const scoutDelay = delay / 2;
+        for (let i = 0; i < waveConfig.scoutCount; i++) {
+            setTimeout(() => {
+                if (!this.gameOver) {
+                    this.spawnEnemy('scout');
+                }
+            }, (scoutDelay + i * 0.5) * 1000 / this.gameSpeed);
+        }
     }
 
     spawnEnemy(type) {
         const enemyType = ENEMY_TYPES[type];
+        const isScout = enemyType.isScout;
 
         this.enemies.push({
             type,
@@ -643,13 +730,15 @@ class Game {
             maxHealth: enemyType.health,
             speed: enemyType.speed,
             pathIndex: 0,
-            path: [...this.currentPath],
+            path: isScout ? this.calculatePath(true) : [...this.currentPath],
             x: START_POINT.x * GRID_SIZE + GRID_SIZE / 2,
             y: START_POINT.y * GRID_SIZE + GRID_SIZE / 2,
             slowEffect: 1,
             slowUntil: 0,
             gridX: START_POINT.x,
-            gridY: START_POINT.y
+            gridY: START_POINT.y,
+            lastPathUpdate: Date.now(),
+            isScout: isScout
         });
 
         this.updateUI();
@@ -673,8 +762,15 @@ class Game {
 
         const adjustedDelta = deltaTime * this.gameSpeed;
 
+        // Пересчитываем пути каждые 100мс
+        const now = Date.now();
+        if (now - this.lastPathRecalc > PATH_RECALC_INTERVAL) {
+            this.recalculateEnemyPaths();
+            this.lastPathRecalc = now;
+        }
+
         this.updateEnemies(adjustedDelta);
-        this.updateTowers(Date.now());
+        this.updateTowers(now);
         this.updateProjectiles(adjustedDelta);
 
         if (this.waveInProgress && this.enemies.length === 0) {
@@ -686,6 +782,29 @@ class Game {
                 this.scheduleNextWave();
             }
         }
+    }
+
+    recalculateEnemyPaths() {
+        // Пересчитываем пути для всех врагов
+        this.enemies.forEach(enemy => {
+            if (enemy.isScout) {
+                // Разведчики не пересчитывают путь
+                return;
+            }
+
+            const currentGrid = {
+                x: Math.floor(enemy.x / GRID_SIZE),
+                y: Math.floor(enemy.y / GRID_SIZE)
+            };
+
+            const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, this.towers);
+            const newPath = pathFinder.findPath(currentGrid, END_POINT, false);
+
+            if (newPath && newPath.length > 1) {
+                enemy.path = newPath;
+                enemy.pathIndex = 0;
+            }
+        });
     }
 
     updateEnemies(deltaTime) {
@@ -717,42 +836,40 @@ class Game {
             let targetX = nextPoint.x * GRID_SIZE + GRID_SIZE / 2;
             let targetY = nextPoint.y * GRID_SIZE + GRID_SIZE / 2;
 
-            // Проверка коллизий с башнями
-            let blocked = false;
+            // Проверка на застревание у башен
+            let repelForceX = 0;
+            let repelForceY = 0;
+
             for (const tower of this.towers) {
                 const dx = enemy.x - tower.x;
                 const dy = enemy.y - tower.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
 
-                if (dist < 25) {
-                    blocked = true;
-
-                    // Находим направление обхода
-                    const angle = Math.atan2(dy, dx);
-                    const avoidX = tower.x + Math.cos(angle) * 30;
-                    const avoidY = tower.y + Math.sin(angle) * 30;
-
-                    targetX = avoidX;
-                    targetY = avoidY;
-                    break;
+                // Отталкивание от самой башни
+                if (dist < 30) {
+                    const force = (30 - dist) / 30;
+                    repelForceX += (dx / dist) * force * 5;
+                    repelForceY += (dy / dist) * force * 5;
                 }
             }
 
-            const dx = targetX - enemy.x;
-            const dy = targetY - enemy.y;
+            const dx = targetX - enemy.x + repelForceX;
+            const dy = targetY - enemy.y + repelForceY;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
             const moveSpeed = enemyType.speed * enemy.slowEffect * deltaTime * 0.03;
 
-            if (distance < moveSpeed && !blocked) {
+            if (distance < moveSpeed && repelForceX === 0 && repelForceY === 0) {
                 enemy.x = nextPoint.x * GRID_SIZE + GRID_SIZE / 2;
                 enemy.y = nextPoint.y * GRID_SIZE + GRID_SIZE / 2;
                 enemy.pathIndex++;
                 enemy.gridX = nextPoint.x;
                 enemy.gridY = nextPoint.y;
             } else {
-                enemy.x += (dx / distance) * moveSpeed;
-                enemy.y += (dy / distance) * moveSpeed;
+                if (distance > 0) {
+                    enemy.x += (dx / distance) * moveSpeed;
+                    enemy.y += (dy / distance) * moveSpeed;
+                }
                 enemy.gridX = Math.floor(enemy.x / GRID_SIZE);
                 enemy.gridY = Math.floor(enemy.y / GRID_SIZE);
             }
@@ -907,7 +1024,7 @@ class Game {
         this.ctx.lineWidth = GRID_SIZE * 0.6;
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
-        this.ctx.globalAlpha = 0.5;
+        this.ctx.globalAlpha = 0.3;
 
         this.ctx.beginPath();
         this.currentPath.forEach((point, index) => {
@@ -976,7 +1093,16 @@ class Game {
 
             this.ctx.fillStyle = type.color;
 
-            if (type.shape === 'square') {
+            if (type.shape === 'triangle') {
+                // Треугольник для разведчиков
+                const size = type.size;
+                this.ctx.beginPath();
+                this.ctx.moveTo(enemy.x, enemy.y - size);
+                this.ctx.lineTo(enemy.x - size, enemy.y + size);
+                this.ctx.lineTo(enemy.x + size, enemy.y + size);
+                this.ctx.closePath();
+                this.ctx.fill();
+            } else if (type.shape === 'square') {
                 const size = type.size;
                 this.ctx.fillRect(enemy.x - size/2, enemy.y - size/2, size, size);
 
@@ -1046,13 +1172,11 @@ class Game {
 
     drawUpgradeButtons() {
         this.upgradeButtons.forEach(btn => {
-            // Тень
             this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
             this.ctx.shadowBlur = 10;
             this.ctx.shadowOffsetX = 2;
             this.ctx.shadowOffsetY = 2;
 
-            // Кнопка
             this.ctx.fillStyle = btn.color;
             this.ctx.beginPath();
             this.ctx.arc(btn.x, btn.y, btn.radius, 0, Math.PI * 2);
@@ -1061,24 +1185,20 @@ class Game {
             this.ctx.shadowColor = 'transparent';
             this.ctx.shadowBlur = 0;
 
-            // Обводка
             const canAfford = this.money >= btn.cost;
             this.ctx.strokeStyle = canAfford ? '#fff' : '#999';
             this.ctx.lineWidth = 3;
             this.ctx.stroke();
 
-            // Иконка
             this.ctx.font = '16px Arial';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText(btn.icon, btn.x, btn.y - 2);
 
-            // Уровень
             this.ctx.fillStyle = 'white';
             this.ctx.font = 'bold 10px Arial';
             this.ctx.fillText(btn.level, btn.x + btn.radius - 6, btn.y - btn.radius + 6);
 
-            // Стоимость
             this.ctx.fillStyle = canAfford ? '#4CAF50' : '#F44336';
             this.ctx.font = 'bold 11px Arial';
             this.ctx.fillText(btn.cost, btn.x, btn.y + btn.radius + 12);
