@@ -60,53 +60,115 @@ const ENEMY_TYPES = {
     basic: {
         name: 'Базовый',
         health: 50,
-        speed: 1,
+        speed: 1.2,
         reward: 10,
-        color: '#E91E63'
+        color: '#E91E63',
+        shape: 'circle',
+        size: 12
     },
     fast: {
         name: 'Быстрый',
         health: 30,
-        speed: 2,
+        speed: 2.5,
         reward: 15,
-        color: '#9C27B0'
+        color: '#9C27B0',
+        shape: 'circle',
+        size: 10
     },
     tank: {
         name: 'Танк',
-        health: 150,
-        speed: 0.5,
+        health: 200,
+        speed: 0.6,
         reward: 30,
-        color: '#795548'
+        color: '#795548',
+        shape: 'square',
+        size: 16,
+        hasShield: true
     },
     boss: {
         name: 'Босс',
         health: 500,
-        speed: 0.3,
+        speed: 0.4,
         reward: 100,
-        color: '#F44336'
+        color: '#F44336',
+        shape: 'square',
+        size: 20,
+        hasShield: true
     }
 };
 
-// Конфигурация волн
-const WAVES = [
-    { enemies: [{ type: 'basic', count: 10 }] },
-    { enemies: [{ type: 'basic', count: 15 }, { type: 'fast', count: 5 }] },
-    { enemies: [{ type: 'basic', count: 10 }, { type: 'fast', count: 10 }] },
-    { enemies: [{ type: 'fast', count: 15 }, { type: 'tank', count: 3 }] },
-    { enemies: [{ type: 'basic', count: 20 }, { type: 'tank', count: 5 }] },
-    { enemies: [{ type: 'fast', count: 20 }, { type: 'tank', count: 8 }] },
-    { enemies: [{ type: 'tank', count: 15 }, { type: 'boss', count: 1 }] },
-    { enemies: [{ type: 'basic', count: 30 }, { type: 'fast', count: 20 }, { type: 'tank', count: 10 }] },
-    { enemies: [{ type: 'tank', count: 20 }, { type: 'boss', count: 2 }] },
-    { enemies: [{ type: 'basic', count: 50 }, { type: 'fast', count: 30 }, { type: 'tank', count: 15 }, { type: 'boss', count: 3 }] }
-];
+// Генерация волн: 7 монстров в первой, +3 каждую следующую
+const WAVES = [];
+for (let i = 0; i < 15; i++) {
+    const enemyCount = 7 + i * 3;
+    const wave = { enemies: [] };
 
-// A* pathfinding
+    if (i === 0) {
+        wave.enemies.push({ type: 'basic', count: enemyCount });
+    } else if (i < 3) {
+        wave.enemies.push(
+            { type: 'basic', count: Math.floor(enemyCount * 0.7) },
+            { type: 'fast', count: Math.floor(enemyCount * 0.3) }
+        );
+    } else if (i < 6) {
+        wave.enemies.push(
+            { type: 'basic', count: Math.floor(enemyCount * 0.5) },
+            { type: 'fast', count: Math.floor(enemyCount * 0.3) },
+            { type: 'tank', count: Math.floor(enemyCount * 0.2) }
+        );
+    } else if (i < 10) {
+        wave.enemies.push(
+            { type: 'basic', count: Math.floor(enemyCount * 0.4) },
+            { type: 'fast', count: Math.floor(enemyCount * 0.3) },
+            { type: 'tank', count: Math.floor(enemyCount * 0.3) }
+        );
+    } else {
+        wave.enemies.push(
+            { type: 'basic', count: Math.floor(enemyCount * 0.3) },
+            { type: 'fast', count: Math.floor(enemyCount * 0.3) },
+            { type: 'tank', count: Math.floor(enemyCount * 0.3) },
+            { type: 'boss', count: Math.max(1, Math.floor(enemyCount * 0.1)) }
+        );
+    }
+
+    WAVES.push(wave);
+}
+
+// A* pathfinding с учетом башен
 class PathFinder {
     constructor(gridCols, gridRows, towers) {
         this.gridCols = gridCols;
         this.gridRows = gridRows;
         this.towers = towers;
+        this.dangerMap = this.buildDangerMap();
+    }
+
+    buildDangerMap() {
+        const map = {};
+
+        this.towers.forEach(tower => {
+            const type = TOWER_TYPES[tower.type];
+            const range = type.range * (1 + (tower.rangeLevel - 1) * 0.2);
+            const rangeInCells = Math.ceil(range / GRID_SIZE);
+
+            for (let dx = -rangeInCells; dx <= rangeInCells; dx++) {
+                for (let dy = -rangeInCells; dy <= rangeInCells; dy++) {
+                    const x = tower.gridX + dx;
+                    const y = tower.gridY + dy;
+
+                    if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
+                        const dist = Math.sqrt(dx * dx + dy * dy) * GRID_SIZE;
+                        if (dist <= range) {
+                            const key = `${x},${y}`;
+                            const danger = 1 - (dist / range); // Чем ближе к башне, тем опаснее
+                            map[key] = (map[key] || 0) + danger * 10;
+                        }
+                    }
+                }
+            }
+        });
+
+        return map;
     }
 
     findPath(start, end) {
@@ -124,7 +186,6 @@ class PathFinder {
         fScore.set(startKey, this.heuristic(start, end));
 
         while (openSet.length > 0) {
-            // Находим узел с наименьшим fScore
             let current = openSet.reduce((min, node) => {
                 const minKey = `${min.x},${min.y}`;
                 const nodeKey = `${node.x},${node.y}`;
@@ -147,7 +208,11 @@ class PathFinder {
 
                 if (closedSet.has(neighborKey)) continue;
 
-                const tentativeGScore = (gScore.get(currentKey) || Infinity) + 1;
+                // Добавляем стоимость опасности от башен
+                const danger = this.dangerMap[neighborKey] || 0;
+                const moveCost = 1 + danger;
+
+                const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
 
                 if (!openSet.some(n => `${n.x},${n.y}` === neighborKey)) {
                     openSet.push(neighbor);
@@ -161,16 +226,20 @@ class PathFinder {
             }
         }
 
-        return null; // Путь не найден
+        return null;
     }
 
     getNeighbors(node) {
         const neighbors = [];
         const directions = [
-            { x: 0, y: -1 }, // вверх
-            { x: 1, y: 0 },  // вправо
-            { x: 0, y: 1 },  // вниз
-            { x: -1, y: 0 }  // влево
+            { x: 0, y: -1 },
+            { x: 1, y: 0 },
+            { x: 0, y: 1 },
+            { x: -1, y: 0 },
+            { x: 1, y: -1 },
+            { x: 1, y: 1 },
+            { x: -1, y: 1 },
+            { x: -1, y: -1 }
         ];
 
         for (const dir of directions) {
@@ -178,9 +247,7 @@ class PathFinder {
             const newY = node.y + dir.y;
 
             if (newX >= 0 && newX < this.gridCols && newY >= 0 && newY < this.gridRows) {
-                // Проверяем, есть ли башня на этой клетке
                 const hasTower = this.towers.some(t => t.gridX === newX && t.gridY === newY);
-
                 if (!hasTower) {
                     neighbors.push({ x: newX, y: newY });
                 }
@@ -191,7 +258,6 @@ class PathFinder {
     }
 
     heuristic(a, b) {
-        // Манхэттенское расстояние
         return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
     }
 
@@ -233,6 +299,8 @@ class Game {
         this.autoWaveTimer = null;
         this.currentPath = null;
 
+        this.upgradeButtons = [];
+
         this.initEventListeners();
         this.gameLoop();
         this.scheduleNextWave();
@@ -249,7 +317,6 @@ class Game {
     }
 
     initEventListeners() {
-        // Башни
         document.querySelectorAll('.tower-card').forEach(card => {
             card.addEventListener('click', () => {
                 const towerType = card.dataset.tower;
@@ -257,7 +324,6 @@ class Game {
             });
         });
 
-        // Canvas клик
         this.canvas.addEventListener('click', (e) => {
             const rect = this.canvas.getBoundingClientRect();
             const x = ((e.clientX - rect.left) / rect.width) * this.canvas.width;
@@ -265,7 +331,6 @@ class Game {
             this.handleCanvasClick(x, y);
         });
 
-        // Кнопки управления
         document.getElementById('startWaveBtn').addEventListener('click', () => {
             this.startWave();
         });
@@ -283,7 +348,7 @@ class Game {
         });
 
         document.getElementById('upgradeTowerBtn').addEventListener('click', () => {
-            this.showUpgradeMenu();
+            // Не используем
         });
 
         document.getElementById('restartBtn').addEventListener('click', () => {
@@ -312,10 +377,23 @@ class Game {
     }
 
     handleCanvasClick(x, y) {
+        // Проверяем клик по кнопкам апгрейда
+        if (this.selectedTower && this.upgradeButtons.length > 0) {
+            for (const btn of this.upgradeButtons) {
+                const dx = x - btn.x;
+                const dy = y - btn.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < btn.radius) {
+                    this.upgradeSelectedTower(btn.type);
+                    return;
+                }
+            }
+        }
+
         const gridX = Math.floor(x / GRID_SIZE);
         const gridY = Math.floor(y / GRID_SIZE);
 
-        // Проверяем, есть ли башня на этой клетке
         const clickedTower = this.towers.find(t =>
             t.gridX === gridX && t.gridY === gridY
         );
@@ -327,38 +405,93 @@ class Game {
                 card.classList.remove('selected');
             });
             this.updateButtons();
+            this.updateUpgradeButtons();
             return;
         }
 
-        // Размещаем новую башню
         if (this.selectedTowerType) {
             this.placeTower(gridX, gridY);
+        } else {
+            this.selectedTower = null;
+            this.upgradeButtons = [];
+            this.updateButtons();
+        }
+    }
+
+    updateUpgradeButtons() {
+        this.upgradeButtons = [];
+
+        if (!this.selectedTower) return;
+
+        const tower = this.selectedTower;
+        const type = TOWER_TYPES[tower.type];
+        const baseCost = type.upgradeBaseCost;
+
+        const buttonRadius = 20;
+        const offset = 45;
+
+        // Кнопка урона
+        if (tower.damageLevel < 7) {
+            this.upgradeButtons.push({
+                type: 'damage',
+                x: tower.x - offset,
+                y: tower.y - offset,
+                radius: buttonRadius,
+                level: tower.damageLevel,
+                cost: baseCost * tower.damageLevel,
+                icon: '⚔️',
+                color: '#FF5722'
+            });
+        }
+
+        // Кнопка дальности
+        if (tower.rangeLevel < 7) {
+            this.upgradeButtons.push({
+                type: 'range',
+                x: tower.x,
+                y: tower.y - offset - 10,
+                radius: buttonRadius,
+                level: tower.rangeLevel,
+                cost: baseCost * tower.rangeLevel,
+                icon: '🎯',
+                color: '#2196F3'
+            });
+        }
+
+        // Кнопка скорости
+        if (tower.speedLevel < 7) {
+            this.upgradeButtons.push({
+                type: 'speed',
+                x: tower.x + offset,
+                y: tower.y - offset,
+                radius: buttonRadius,
+                level: tower.speedLevel,
+                cost: baseCost * tower.speedLevel,
+                icon: '⚡',
+                color: '#FFC107'
+            });
         }
     }
 
     placeTower(gridX, gridY) {
         const type = TOWER_TYPES[this.selectedTowerType];
 
-        // Проверки
         if (this.money < type.cost) return;
         if (gridX < 0 || gridX >= GRID_COLS || gridY < 0 || gridY >= GRID_ROWS) return;
         if (this.towers.some(t => t.gridX === gridX && t.gridY === gridY)) return;
 
-        // Проверяем, что башня не на старте или финише
         if ((gridX === START_POINT.x && gridY === START_POINT.y) ||
             (gridX === END_POINT.x && gridY === END_POINT.y)) return;
 
-        // Проверяем, что после установки башни останется путь
-        const testTowers = [...this.towers, { gridX, gridY }];
+        const testTowers = [...this.towers, { gridX, gridY, type: this.selectedTowerType, rangeLevel: 1 }];
         const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, testTowers);
         const testPath = pathFinder.findPath(START_POINT, END_POINT);
 
         if (!testPath) {
-            alert('Нельзя заблокировать путь врагов!');
+            alert('Нельзя полностью заблокировать путь врагов!');
             return;
         }
 
-        // Создаем башню
         this.towers.push({
             type: this.selectedTowerType,
             gridX,
@@ -401,58 +534,47 @@ class Game {
         this.money += refund;
         this.towers = this.towers.filter(t => t !== this.selectedTower);
         this.selectedTower = null;
+        this.upgradeButtons = [];
 
         this.updateUI();
         this.updateButtons();
     }
 
-    showUpgradeMenu() {
+    upgradeSelectedTower(upgradeType) {
         if (!this.selectedTower) return;
 
         const type = TOWER_TYPES[this.selectedTower.type];
         const baseCost = type.upgradeBaseCost;
 
-        const damageCost = this.selectedTower.damageLevel < 7 ? baseCost * this.selectedTower.damageLevel : null;
-        const rangeCost = this.selectedTower.rangeLevel < 7 ? baseCost * this.selectedTower.rangeLevel : null;
-        const speedCost = this.selectedTower.speedLevel < 7 ? baseCost * this.selectedTower.speedLevel : null;
+        let cost = 0;
+        let canUpgrade = false;
 
-        let message = `Выберите улучшение для башни "${type.name}":\n\n`;
-
-        if (damageCost !== null) {
-            message += `1. Урон (Уровень ${this.selectedTower.damageLevel}/7) - ${damageCost} монет\n`;
-        } else {
-            message += `1. Урон - МАКС\n`;
+        if (upgradeType === 'damage' && this.selectedTower.damageLevel < 7) {
+            cost = baseCost * this.selectedTower.damageLevel;
+            canUpgrade = true;
+        } else if (upgradeType === 'range' && this.selectedTower.rangeLevel < 7) {
+            cost = baseCost * this.selectedTower.rangeLevel;
+            canUpgrade = true;
+        } else if (upgradeType === 'speed' && this.selectedTower.speedLevel < 7) {
+            cost = baseCost * this.selectedTower.speedLevel;
+            canUpgrade = true;
         }
 
-        if (rangeCost !== null) {
-            message += `2. Дальность (Уровень ${this.selectedTower.rangeLevel}/7) - ${rangeCost} монет\n`;
-        } else {
-            message += `2. Дальность - МАКС\n`;
+        if (canUpgrade && this.money >= cost) {
+            this.money -= cost;
+
+            if (upgradeType === 'damage') {
+                this.selectedTower.damageLevel++;
+            } else if (upgradeType === 'range') {
+                this.selectedTower.rangeLevel++;
+            } else if (upgradeType === 'speed') {
+                this.selectedTower.speedLevel++;
+            }
+
+            this.updateUI();
+            this.updateButtons();
+            this.updateUpgradeButtons();
         }
-
-        if (speedCost !== null) {
-            message += `3. Скорость (Уровень ${this.selectedTower.speedLevel}/7) - ${speedCost} монет\n`;
-        } else {
-            message += `3. Скорость - МАКС\n`;
-        }
-
-        message += `\nДеньги: ${this.money}\nВведите 1, 2 или 3:`;
-
-        const choice = prompt(message);
-
-        if (choice === '1' && damageCost !== null && this.money >= damageCost) {
-            this.money -= damageCost;
-            this.selectedTower.damageLevel++;
-        } else if (choice === '2' && rangeCost !== null && this.money >= rangeCost) {
-            this.money -= rangeCost;
-            this.selectedTower.rangeLevel++;
-        } else if (choice === '3' && speedCost !== null && this.money >= speedCost) {
-            this.money -= speedCost;
-            this.selectedTower.speedLevel++;
-        }
-
-        this.updateUI();
-        this.updateButtons();
     }
 
     updateButtons() {
@@ -461,15 +583,10 @@ class Game {
 
         if (this.selectedTower) {
             sellBtn.disabled = false;
-
-            const maxed = this.selectedTower.damageLevel >= 7 &&
-                         this.selectedTower.rangeLevel >= 7 &&
-                         this.selectedTower.speedLevel >= 7;
-
-            upgradeBtn.disabled = maxed;
+            upgradeBtn.style.display = 'none';
         } else {
             sellBtn.disabled = true;
-            upgradeBtn.disabled = true;
+            upgradeBtn.style.display = 'none';
         }
     }
 
@@ -495,7 +612,6 @@ class Game {
         this.waveInProgress = true;
         this.wave++;
 
-        // Пересчитываем путь перед волной
         this.calculatePath();
 
         this.spawnWave();
@@ -527,11 +643,13 @@ class Game {
             maxHealth: enemyType.health,
             speed: enemyType.speed,
             pathIndex: 0,
-            path: this.currentPath,
+            path: [...this.currentPath],
             x: START_POINT.x * GRID_SIZE + GRID_SIZE / 2,
             y: START_POINT.y * GRID_SIZE + GRID_SIZE / 2,
             slowEffect: 1,
-            slowUntil: 0
+            slowUntil: 0,
+            gridX: START_POINT.x,
+            gridY: START_POINT.y
         });
 
         this.updateUI();
@@ -555,16 +673,10 @@ class Game {
 
         const adjustedDelta = deltaTime * this.gameSpeed;
 
-        // Обновляем врагов
         this.updateEnemies(adjustedDelta);
-
-        // Обновляем башни
         this.updateTowers(Date.now());
-
-        // Обновляем снаряды
         this.updateProjectiles(adjustedDelta);
 
-        // Проверяем окончание волны
         if (this.waveInProgress && this.enemies.length === 0) {
             this.waveInProgress = false;
 
@@ -581,7 +693,6 @@ class Game {
             const enemy = this.enemies[i];
             const enemyType = ENEMY_TYPES[enemy.type];
 
-            // Проверяем эффект замедления
             const now = Date.now();
             if (now < enemy.slowUntil) {
                 enemy.slowEffect = 0.5;
@@ -589,9 +700,7 @@ class Game {
                 enemy.slowEffect = 1;
             }
 
-            // Движение по пути
             if (!enemy.path || enemy.pathIndex >= enemy.path.length - 1) {
-                // Враг дошел до конца
                 this.lives--;
                 this.enemies.splice(i, 1);
 
@@ -605,8 +714,29 @@ class Game {
             }
 
             const nextPoint = enemy.path[enemy.pathIndex + 1];
-            const targetX = nextPoint.x * GRID_SIZE + GRID_SIZE / 2;
-            const targetY = nextPoint.y * GRID_SIZE + GRID_SIZE / 2;
+            let targetX = nextPoint.x * GRID_SIZE + GRID_SIZE / 2;
+            let targetY = nextPoint.y * GRID_SIZE + GRID_SIZE / 2;
+
+            // Проверка коллизий с башнями
+            let blocked = false;
+            for (const tower of this.towers) {
+                const dx = enemy.x - tower.x;
+                const dy = enemy.y - tower.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 25) {
+                    blocked = true;
+
+                    // Находим направление обхода
+                    const angle = Math.atan2(dy, dx);
+                    const avoidX = tower.x + Math.cos(angle) * 30;
+                    const avoidY = tower.y + Math.sin(angle) * 30;
+
+                    targetX = avoidX;
+                    targetY = avoidY;
+                    break;
+                }
+            }
 
             const dx = targetX - enemy.x;
             const dy = targetY - enemy.y;
@@ -614,16 +744,19 @@ class Game {
 
             const moveSpeed = enemyType.speed * enemy.slowEffect * deltaTime * 0.03;
 
-            if (distance < moveSpeed) {
-                enemy.x = targetX;
-                enemy.y = targetY;
+            if (distance < moveSpeed && !blocked) {
+                enemy.x = nextPoint.x * GRID_SIZE + GRID_SIZE / 2;
+                enemy.y = nextPoint.y * GRID_SIZE + GRID_SIZE / 2;
                 enemy.pathIndex++;
+                enemy.gridX = nextPoint.x;
+                enemy.gridY = nextPoint.y;
             } else {
                 enemy.x += (dx / distance) * moveSpeed;
                 enemy.y += (dy / distance) * moveSpeed;
+                enemy.gridX = Math.floor(enemy.x / GRID_SIZE);
+                enemy.gridY = Math.floor(enemy.y / GRID_SIZE);
             }
 
-            // Проверяем смерть
             if (enemy.health <= 0) {
                 this.money += enemyType.reward;
                 this.score += enemyType.reward * 10;
@@ -637,16 +770,13 @@ class Game {
         this.towers.forEach(tower => {
             const type = TOWER_TYPES[tower.type];
 
-            // Вычисляем параметры с учетом улучшений
             const fireRate = type.fireRate / (1 + (tower.speedLevel - 1) * 0.15);
             const adjustedFireRate = fireRate / this.gameSpeed;
 
             if (now - tower.lastFire < adjustedFireRate) return;
 
-            // Вычисляем дальность с учетом улучшений
             const range = type.range * (1 + (tower.rangeLevel - 1) * 0.2);
 
-            // Находим ближайшего врага в радиусе
             let target = null;
             let minDistance = range;
 
@@ -670,8 +800,6 @@ class Game {
 
     fireProjectile(tower, target) {
         const type = TOWER_TYPES[tower.type];
-
-        // Вычисляем урон с учетом улучшений
         const damage = type.damage * (1 + (tower.damageLevel - 1) * 0.3);
 
         this.projectiles.push({
@@ -691,13 +819,11 @@ class Game {
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const proj = this.projectiles[i];
 
-            // Если цель мертва, удаляем снаряд
             if (!this.enemies.includes(proj.target)) {
                 this.projectiles.splice(i, 1);
                 continue;
             }
 
-            // Обновляем позицию цели
             proj.targetX = proj.target.x;
             proj.targetY = proj.target.y;
 
@@ -708,7 +834,6 @@ class Game {
             const moveDistance = proj.speed * deltaTime * 0.1;
 
             if (distance < moveDistance || distance < 5) {
-                // Попадание
                 this.hitTarget(proj);
                 this.projectiles.splice(i, 1);
             } else {
@@ -721,7 +846,6 @@ class Game {
     hitTarget(proj) {
         const type = TOWER_TYPES[proj.tower.type];
 
-        // Эффект пушки (AOE)
         if (type.splashRadius) {
             this.enemies.forEach(enemy => {
                 const dx = enemy.x - proj.target.x;
@@ -734,38 +858,26 @@ class Game {
             });
         }
 
-        // Эффект заморозки
         if (type.slowEffect) {
             proj.target.slowUntil = Date.now() + type.slowDuration;
         }
 
-        // Основной урон
         proj.target.health -= proj.damage;
     }
 
     draw() {
-        // Очищаем canvas
         this.ctx.fillStyle = '#2d5016';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Рисуем сетку
         this.drawGrid();
-
-        // Рисуем путь
         this.drawPath();
-
-        // Рисуем башни
         this.drawTowers();
-
-        // Рисуем врагов
         this.drawEnemies();
-
-        // Рисуем снаряды
         this.drawProjectiles();
 
-        // Рисуем радиус выбранной башни
         if (this.selectedTower) {
             this.drawTowerRange(this.selectedTower);
+            this.drawUpgradeButtons();
         }
     }
 
@@ -792,9 +904,10 @@ class Game {
         if (!this.currentPath || this.currentPath.length < 2) return;
 
         this.ctx.strokeStyle = '#8B4513';
-        this.ctx.lineWidth = GRID_SIZE * 0.8;
+        this.ctx.lineWidth = GRID_SIZE * 0.6;
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
+        this.ctx.globalAlpha = 0.5;
 
         this.ctx.beginPath();
         this.currentPath.forEach((point, index) => {
@@ -808,8 +921,8 @@ class Game {
             }
         });
         this.ctx.stroke();
+        this.ctx.globalAlpha = 1;
 
-        // Стартовая точка
         this.ctx.fillStyle = '#4CAF50';
         this.ctx.beginPath();
         this.ctx.arc(
@@ -821,7 +934,6 @@ class Game {
         );
         this.ctx.fill();
 
-        // Конечная точка
         this.ctx.fillStyle = '#F44336';
         this.ctx.beginPath();
         this.ctx.arc(
@@ -838,7 +950,6 @@ class Game {
         this.towers.forEach(tower => {
             const type = TOWER_TYPES[tower.type];
 
-            // Основа башни
             this.ctx.fillStyle = type.color;
             this.ctx.strokeStyle = this.selectedTower === tower ? '#FFD700' : '#333';
             this.ctx.lineWidth = this.selectedTower === tower ? 4 : 2;
@@ -848,7 +959,6 @@ class Game {
             this.ctx.fill();
             this.ctx.stroke();
 
-            // Показываем уровни улучшений
             const totalLevel = tower.damageLevel + tower.rangeLevel + tower.speedLevel;
             if (totalLevel > 3) {
                 this.ctx.fillStyle = 'white';
@@ -864,13 +974,23 @@ class Game {
         this.enemies.forEach(enemy => {
             const type = ENEMY_TYPES[enemy.type];
 
-            // Тело врага
             this.ctx.fillStyle = type.color;
-            this.ctx.beginPath();
-            this.ctx.arc(enemy.x, enemy.y, 12, 0, Math.PI * 2);
-            this.ctx.fill();
 
-            // Полоска здоровья
+            if (type.shape === 'square') {
+                const size = type.size;
+                this.ctx.fillRect(enemy.x - size/2, enemy.y - size/2, size, size);
+
+                if (type.hasShield) {
+                    this.ctx.strokeStyle = '#FFD700';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.strokeRect(enemy.x - size/2 - 2, enemy.y - size/2 - 2, size + 4, size + 4);
+                }
+            } else {
+                this.ctx.beginPath();
+                this.ctx.arc(enemy.x, enemy.y, type.size, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+
             const healthBarWidth = 24;
             const healthBarHeight = 4;
             const healthPercent = enemy.health / enemy.maxHealth;
@@ -878,7 +998,7 @@ class Game {
             this.ctx.fillStyle = '#333';
             this.ctx.fillRect(
                 enemy.x - healthBarWidth / 2,
-                enemy.y - 20,
+                enemy.y - type.size - 8,
                 healthBarWidth,
                 healthBarHeight
             );
@@ -886,17 +1006,16 @@ class Game {
             this.ctx.fillStyle = healthPercent > 0.5 ? '#4CAF50' : healthPercent > 0.25 ? '#FFC107' : '#F44336';
             this.ctx.fillRect(
                 enemy.x - healthBarWidth / 2,
-                enemy.y - 20,
+                enemy.y - type.size - 8,
                 healthBarWidth * healthPercent,
                 healthBarHeight
             );
 
-            // Эффект замедления
             if (Date.now() < enemy.slowUntil) {
                 this.ctx.strokeStyle = '#00BCD4';
                 this.ctx.lineWidth = 2;
                 this.ctx.beginPath();
-                this.ctx.arc(enemy.x, enemy.y, 15, 0, Math.PI * 2);
+                this.ctx.arc(enemy.x, enemy.y, type.size + 3, 0, Math.PI * 2);
                 this.ctx.stroke();
             }
         });
@@ -925,6 +1044,47 @@ class Game {
         this.ctx.stroke();
     }
 
+    drawUpgradeButtons() {
+        this.upgradeButtons.forEach(btn => {
+            // Тень
+            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            this.ctx.shadowBlur = 10;
+            this.ctx.shadowOffsetX = 2;
+            this.ctx.shadowOffsetY = 2;
+
+            // Кнопка
+            this.ctx.fillStyle = btn.color;
+            this.ctx.beginPath();
+            this.ctx.arc(btn.x, btn.y, btn.radius, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            this.ctx.shadowColor = 'transparent';
+            this.ctx.shadowBlur = 0;
+
+            // Обводка
+            const canAfford = this.money >= btn.cost;
+            this.ctx.strokeStyle = canAfford ? '#fff' : '#999';
+            this.ctx.lineWidth = 3;
+            this.ctx.stroke();
+
+            // Иконка
+            this.ctx.font = '16px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(btn.icon, btn.x, btn.y - 2);
+
+            // Уровень
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = 'bold 10px Arial';
+            this.ctx.fillText(btn.level, btn.x + btn.radius - 6, btn.y - btn.radius + 6);
+
+            // Стоимость
+            this.ctx.fillStyle = canAfford ? '#4CAF50' : '#F44336';
+            this.ctx.font = 'bold 11px Arial';
+            this.ctx.fillText(btn.cost, btn.x, btn.y + btn.radius + 12);
+        });
+    }
+
     updateUI() {
         document.getElementById('money').textContent = this.money;
         document.getElementById('lives').textContent = this.lives;
@@ -932,7 +1092,6 @@ class Game {
         document.getElementById('enemies').textContent = this.enemies.length;
         document.getElementById('score').textContent = this.score;
 
-        // Обновляем доступность башен
         document.querySelectorAll('.tower-card').forEach(card => {
             const type = TOWER_TYPES[card.dataset.tower];
             if (this.money < type.cost) {
@@ -991,7 +1150,6 @@ class Game {
     }
 }
 
-// Запуск игры
 window.addEventListener('load', () => {
     new Game();
 });
