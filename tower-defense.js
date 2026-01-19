@@ -316,16 +316,16 @@ class PathFinder {
                     return distN < distClosest ? n : closest;
                 });
             } else {
-                // Случайный сосед с небольшим bias к цели
-                if (Math.random() < 0.3) {
-                    // 30% шанс идти к цели
+                // Случайный сосед с сильным bias к цели
+                if (Math.random() < 0.75) {
+                    // 75% шанс идти к цели - разведчики должны продвигаться вперед!
                     current = neighbors.reduce((closest, n) => {
                         const distN = Math.abs(n.x - end.x) + Math.abs(n.y - end.y);
                         const distClosest = Math.abs(closest.x - end.x) + Math.abs(closest.y - end.y);
                         return distN < distClosest ? n : closest;
                     });
                 } else {
-                    // 70% шанс случайное направление
+                    // 25% шанс случайное направление для разведки
                     current = neighbors[Math.floor(Math.random() * neighbors.length)];
                 }
             }
@@ -751,6 +751,18 @@ class Game {
         const waveConfig = WAVES[this.wave - 1];
         let delay = 0;
 
+        // Спавним разведчиков ПЕРВЫМИ - они летят впереди волны!
+        for (let i = 0; i < waveConfig.scoutCount; i++) {
+            setTimeout(() => {
+                if (!this.gameOver) {
+                    this.spawnEnemy('scout');
+                }
+            }, (i * 0.3) * 1000 / this.gameSpeed); // Быстро один за другим
+        }
+
+        // Задержка перед основной волной
+        delay = 1.5;
+
         // Спавним обычных врагов
         waveConfig.enemies.forEach(({ type, count }) => {
             for (let i = 0; i < count; i++) {
@@ -762,21 +774,24 @@ class Game {
                 delay += 0.8;
             }
         });
-
-        // Спавним разведчиков в середине волны
-        const scoutDelay = delay / 2;
-        for (let i = 0; i < waveConfig.scoutCount; i++) {
-            setTimeout(() => {
-                if (!this.gameOver) {
-                    this.spawnEnemy('scout');
-                }
-            }, (scoutDelay + i * 0.5) * 1000 / this.gameSpeed);
-        }
     }
 
     spawnEnemy(type) {
         const enemyType = ENEMY_TYPES[type];
         const isScout = enemyType.isScout;
+
+        // Разведчики стартуют с разных позиций по вертикали для разброса путей
+        let startX = START_POINT.x;
+        let startY = START_POINT.y;
+
+        if (isScout) {
+            // Случайное смещение по вертикали (±3 клетки от центра)
+            const offset = Math.floor(Math.random() * 7) - 3; // от -3 до +3
+            startY = Math.max(0, Math.min(GRID_ROWS - 1, START_POINT.y + offset));
+        }
+
+        const startPoint = { x: startX, y: startY };
+        const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, this.towers);
 
         this.enemies.push({
             type,
@@ -784,13 +799,13 @@ class Game {
             maxHealth: enemyType.health,
             speed: enemyType.speed,
             pathIndex: 0,
-            path: isScout ? this.calculatePath(true) : [...this.currentPath],
-            x: START_POINT.x * GRID_SIZE + GRID_SIZE / 2,
-            y: START_POINT.y * GRID_SIZE + GRID_SIZE / 2,
+            path: isScout ? pathFinder.findPath(startPoint, END_POINT, true) : [...this.currentPath],
+            x: startX * GRID_SIZE + GRID_SIZE / 2,
+            y: startY * GRID_SIZE + GRID_SIZE / 2,
             slowEffect: 1,
             slowUntil: 0,
-            gridX: START_POINT.x,
-            gridY: START_POINT.y,
+            gridX: startX,
+            gridY: startY,
             lastPathUpdate: Date.now(),
             isScout: isScout
         });
