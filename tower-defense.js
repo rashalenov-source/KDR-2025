@@ -160,7 +160,9 @@ class PathFinder {
     buildDangerMap() {
         const map = {};
 
-        this.towers.forEach(tower => {
+        console.log(`Building danger map for ${this.towers.length} towers`);
+
+        this.towers.forEach((tower, i) => {
             const type = TOWER_TYPES[tower.type];
             const range = type.range * (1 + (tower.rangeLevel - 1) * 0.2);
             const damage = type.damage * (1 + (tower.damageLevel - 1) * 0.3);
@@ -168,6 +170,8 @@ class PathFinder {
 
             // DPS башни
             const dps = damage / (fireRate / 1000);
+
+            console.log(`Tower ${i} (${tower.type}) at [${tower.gridX}, ${tower.gridY}]: DPS=${dps.toFixed(2)}, range=${range.toFixed(0)}, baseDanger=${(dps * 2000).toFixed(0)}`);
 
             const rangeInCells = Math.ceil((range + 60) / GRID_SIZE); // +60 для большего отступа
 
@@ -1006,6 +1010,7 @@ class Game {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.drawGrid();
+        this.drawDangerMap(); // ОТЛАДКА: показываем карту опасности
         this.drawPath();
         this.drawTowers();
         this.drawEnemies();
@@ -1033,6 +1038,51 @@ class Game {
             this.ctx.moveTo(0, y * GRID_SIZE);
             this.ctx.lineTo(this.canvas.width, y * GRID_SIZE);
             this.ctx.stroke();
+        }
+    }
+
+    drawDangerMap() {
+        // ОТЛАДКА: визуализация карты опасности
+        if (this.towers.length === 0) return;
+
+        const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, this.towers);
+        const dangerMap = pathFinder.dangerMap;
+
+        // Найдем максимальное значение опасности для нормализации
+        let maxDanger = 0;
+        Object.values(dangerMap).forEach(danger => {
+            if (danger > maxDanger) maxDanger = danger;
+        });
+
+        if (maxDanger === 0) {
+            console.log('WARNING: dangerMap is empty or all zeros!');
+            return;
+        }
+
+        console.log('Max danger value:', maxDanger);
+
+        // Рисуем опасные клетки
+        for (let y = 0; y < GRID_ROWS; y++) {
+            for (let x = 0; x < GRID_COLS; x++) {
+                const key = `${x},${y}`;
+                const danger = dangerMap[key] || 0;
+
+                if (danger > 0) {
+                    // Нормализуем от 0 до 1
+                    const normalized = Math.min(danger / maxDanger, 1);
+
+                    // Красный цвет с прозрачностью
+                    this.ctx.fillStyle = `rgba(255, 0, 0, ${normalized * 0.5})`;
+                    this.ctx.fillRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+
+                    // Показываем значение опасности на клетке
+                    if (danger > maxDanger * 0.3) {
+                        this.ctx.fillStyle = 'white';
+                        this.ctx.font = '10px Arial';
+                        this.ctx.fillText(Math.round(danger), x * GRID_SIZE + 2, y * GRID_SIZE + 12);
+                    }
+                }
+            }
         }
     }
 
