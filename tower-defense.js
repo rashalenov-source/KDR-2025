@@ -613,6 +613,9 @@ class Game {
         this.money -= type.cost;
         this.updateUI();
 
+        // КРИТИЧНО: пересчитываем пути врагов сразу после установки башни!
+        this.recalculateEnemyPaths();
+
         this.selectedTowerType = null;
         document.querySelectorAll('.tower-card').forEach(card => {
             card.classList.remove('selected');
@@ -641,6 +644,9 @@ class Game {
         this.towers = this.towers.filter(t => t !== this.selectedTower);
         this.selectedTower = null;
         this.upgradeButtons = [];
+
+        // КРИТИЧНО: пересчитываем пути врагов сразу после продажи башни!
+        this.recalculateEnemyPaths();
 
         this.updateUI();
         this.updateButtons();
@@ -676,6 +682,9 @@ class Game {
             } else if (upgradeType === 'speed') {
                 this.selectedTower.speedLevel++;
             }
+
+            // КРИТИЧНО: пересчитываем пути врагов сразу после апгрейда башни!
+            this.recalculateEnemyPaths();
 
             this.updateUI();
             this.updateButtons();
