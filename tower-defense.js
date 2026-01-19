@@ -212,6 +212,18 @@ class PathFinder {
             return this.findRandomPath(start, end);
         }
 
+        // Сначала пытаемся найти безопасный путь (блокируем опасные клетки)
+        let path = this.findPathWithDangerBlocking(start, end, true);
+
+        // Если безопасный путь не найден, пытаемся с опасными клетками
+        if (!path) {
+            path = this.findPathWithDangerBlocking(start, end, false);
+        }
+
+        return path;
+    }
+
+    findPathWithDangerBlocking(start, end, blockDangerous) {
         const openSet = [];
         const closedSet = new Set();
         const cameFrom = new Map();
@@ -241,7 +253,7 @@ class PathFinder {
             openSet.splice(openSet.indexOf(current), 1);
             closedSet.add(currentKey);
 
-            const neighbors = this.getNeighbors(current);
+            const neighbors = this.getNeighbors(current, blockDangerous);
 
             for (const neighbor of neighbors) {
                 const neighborKey = `${neighbor.x},${neighbor.y}`;
@@ -330,7 +342,7 @@ class PathFinder {
         return path;
     }
 
-    getNeighbors(node) {
+    getNeighbors(node, blockDangerous = false) {
         const neighbors = [];
         const directions = [
             { x: 0, y: -1 },
@@ -349,7 +361,16 @@ class PathFinder {
 
             if (newX >= 0 && newX < this.gridCols && newY >= 0 && newY < this.gridRows) {
                 const hasTower = this.towers.some(t => t.gridX === newX && t.gridY === newY);
-                if (!hasTower) {
+
+                // КРИТИЧНО: блокируем клетки с экстремально высокой опасностью
+                let isBlocked = false;
+                if (blockDangerous) {
+                    const neighborKey = `${newX},${newY}`;
+                    const danger = this.dangerMap[neighborKey] || 0;
+                    isBlocked = danger > 10000; // Если опасность > 10000, клетка непроходима
+                }
+
+                if (!hasTower && !isBlocked) {
                     neighbors.push({ x: newX, y: newY });
                 }
             }
@@ -1020,7 +1041,7 @@ class Game {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.drawGrid();
-        this.drawDangerMap(); // ОТЛАДКА: показываем карту опасности
+        // this.drawDangerMap(); // ОТКЛЮЧЕНО: тормозит игру (50-75ms на кадр)
         this.drawPath();
         this.drawTowers();
         this.drawEnemies();
