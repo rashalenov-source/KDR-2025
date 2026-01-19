@@ -174,6 +174,7 @@ class PathFinder {
             console.log(`Tower ${i} (${tower.type}) at [${tower.gridX}, ${tower.gridY}]: DPS=${dps.toFixed(2)}, range=${range.toFixed(0)}, baseDanger=${(dps * 2000).toFixed(0)}`);
 
             const rangeInCells = Math.ceil((range + 60) / GRID_SIZE); // +60 для большего отступа
+            const effectiveRange = range + 60; // ИСПРАВЛЕНИЕ: используем расширенный радиус
 
             for (let dx = -rangeInCells; dx <= rangeInCells; dx++) {
                 for (let dy = -rangeInCells; dy <= rangeInCells; dy++) {
@@ -183,11 +184,11 @@ class PathFinder {
                     if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
                         const dist = Math.sqrt(dx * dx + dy * dy) * GRID_SIZE;
 
-                        if (dist <= range) {
+                        if (dist <= effectiveRange) { // ИСПРАВЛЕНИЕ: сравниваем с расширенным радиусом!
                             const key = `${x},${y}`;
 
                             // Нормализованное расстояние (0 = в центре, 1 = на краю)
-                            const normalizedDist = dist / range;
+                            const normalizedDist = dist / effectiveRange;
 
                             // ЭКСТРЕМАЛЬНАЯ опасность: чем ближе к башне, тем НЕВЕРОЯТНО опаснее
                             // Используем степень 5 для очень резкого роста
@@ -255,12 +256,14 @@ class PathFinder {
                 const danger = this.dangerMap[neighborKey] || 0;
                 const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
 
-                // ЭКСПОНЕНЦИАЛЬНЫЙ множитель - делает опасные клетки почти непроходимыми!
-                // Если danger = 0, множитель = 1 (обычная стоимость)
-                // Если danger = 500, множитель = e^1 ≈ 2.7
-                // Если danger = 1500, множитель = e^3 ≈ 20
-                // Если danger = 5000, множитель = e^10 ≈ 22000 (НЕВЕРОЯТНО ДОРОГО!)
-                const dangerMultiplier = Math.exp(danger / 500);
+                // ЭКСПОНЕНЦИАЛЬНЫЙ множитель с ограничением
+                // Ограничиваем показатель степени до 10, чтобы избежать Infinity
+                // danger = 0 → множитель = 1
+                // danger = 1000 → множитель = e^2 ≈ 7.4
+                // danger = 5000 → множитель = e^10 ≈ 22000
+                // danger > 5000 → множитель = 22000 (ограничено)
+                const exponent = Math.min(danger / 500, 10);
+                const dangerMultiplier = Math.exp(exponent);
                 const moveCost = baseCost * dangerMultiplier;
 
                 const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
