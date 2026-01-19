@@ -160,8 +160,6 @@ class PathFinder {
     buildDangerMap() {
         const map = {};
 
-        console.log(`Building danger map for ${this.towers.length} towers`);
-
         this.towers.forEach((tower, i) => {
             const type = TOWER_TYPES[tower.type];
             const range = type.range * (1 + (tower.rangeLevel - 1) * 0.2);
@@ -170,8 +168,6 @@ class PathFinder {
 
             // DPS башни
             const dps = damage / (fireRate / 1000);
-
-            console.log(`Tower ${i} (${tower.type}) at [${tower.gridX}, ${tower.gridY}]: DPS=${dps.toFixed(2)}, range=${range.toFixed(0)}, baseDanger=${(dps * 2000).toFixed(0)}`);
 
             const rangeInCells = Math.ceil((range + 60) / GRID_SIZE); // +60 для большего отступа
             const effectiveRange = range + 60; // ИСПРАВЛЕНИЕ: используем расширенный радиус
@@ -265,10 +261,6 @@ class PathFinder {
                 const exponent = Math.min(danger / 5000, 20);
                 const dangerMultiplier = Math.exp(exponent);
                 const moveCost = baseCost * dangerMultiplier;
-
-                if (danger > 1000) {
-                    console.log(`Клетка [${neighbor.x}, ${neighbor.y}]: danger=${danger.toFixed(0)}, exponent=${exponent.toFixed(2)}, multiplier=${dangerMultiplier.toFixed(0)}, cost=${moveCost.toFixed(0)}`);
-                }
 
                 const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
 
@@ -618,6 +610,7 @@ class Game {
         this.updateUI();
 
         // КРИТИЧНО: пересчитываем пути врагов сразу после установки башни!
+        console.log(`🗼 Башня установлена! Пересчитываем пути для ${this.enemies.length} врагов`);
         this.recalculateEnemyPaths();
 
         this.selectedTowerType = null;
@@ -688,6 +681,7 @@ class Game {
             }
 
             // КРИТИЧНО: пересчитываем пути врагов сразу после апгрейда башни!
+            console.log(`⬆️ Апгрейд башни (${upgradeType})! Пересчитываем пути для ${this.enemies.length} врагов`);
             this.recalculateEnemyPaths();
 
             this.updateUI();
@@ -825,8 +819,6 @@ class Game {
 
     recalculateEnemyPaths() {
         // Пересчитываем пути для всех врагов
-        console.log(`Пересчет путей для ${this.enemies.length} врагов`);
-
         this.enemies.forEach(enemy => {
             if (enemy.isScout) {
                 // Разведчики не пересчитывают путь
@@ -842,11 +834,8 @@ class Game {
             const newPath = pathFinder.findPath(currentGrid, END_POINT, false);
 
             if (newPath && newPath.length > 1) {
-                console.log(`Враг на [${currentGrid.x}, ${currentGrid.y}] получил новый путь длиной ${newPath.length}`);
                 enemy.path = newPath;
                 enemy.pathIndex = 0;
-            } else {
-                console.log(`ОШИБКА: не найден путь для врага на [${currentGrid.x}, ${currentGrid.y}]`);
             }
         });
     }
@@ -1075,12 +1064,7 @@ class Game {
             if (danger > maxDanger) maxDanger = danger;
         });
 
-        if (maxDanger === 0) {
-            console.log('WARNING: dangerMap is empty or all zeros!');
-            return;
-        }
-
-        console.log('Max danger value:', maxDanger);
+        if (maxDanger === 0) return;
 
         // Рисуем опасные клетки
         for (let y = 0; y < GRID_ROWS; y++) {
