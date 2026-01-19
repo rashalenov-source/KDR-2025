@@ -194,8 +194,8 @@ class PathFinder {
                             // Используем степень 5 для очень резкого роста
                             const distanceFactor = Math.pow(1 - normalizedDist, 5);
 
-                            // Базовая опасность зависит от DPS - сильно увеличена
-                            const baseDanger = dps * 2000;
+                            // Базовая опасность зависит от DPS - РАДИКАЛЬНО увеличена в 10 раз!
+                            const baseDanger = dps * 20000;
 
                             // Итоговая опасность
                             const dangerFromTower = distanceFactor * baseDanger;
@@ -257,14 +257,18 @@ class PathFinder {
                 const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
 
                 // ЭКСПОНЕНЦИАЛЬНЫЙ множитель с ограничением
-                // Ограничиваем показатель степени до 10, чтобы избежать Infinity
+                // С новой базовой опасностью dps*20000:
                 // danger = 0 → множитель = 1
-                // danger = 1000 → множитель = e^2 ≈ 7.4
-                // danger = 5000 → множитель = e^10 ≈ 22000
-                // danger > 5000 → множитель = 22000 (ограничено)
-                const exponent = Math.min(danger / 500, 10);
+                // danger = 50000 → множитель = e^10 ≈ 22000
+                // danger = 100000 → множитель = e^20 ≈ 485 млн (огромно!)
+                // danger > 100000 → множитель = 485 млн (ограничено)
+                const exponent = Math.min(danger / 5000, 20);
                 const dangerMultiplier = Math.exp(exponent);
                 const moveCost = baseCost * dangerMultiplier;
+
+                if (danger > 1000) {
+                    console.log(`Клетка [${neighbor.x}, ${neighbor.y}]: danger=${danger.toFixed(0)}, exponent=${exponent.toFixed(2)}, multiplier=${dangerMultiplier.toFixed(0)}, cost=${moveCost.toFixed(0)}`);
+                }
 
                 const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
 
@@ -821,6 +825,8 @@ class Game {
 
     recalculateEnemyPaths() {
         // Пересчитываем пути для всех врагов
+        console.log(`Пересчет путей для ${this.enemies.length} врагов`);
+
         this.enemies.forEach(enemy => {
             if (enemy.isScout) {
                 // Разведчики не пересчитывают путь
@@ -836,8 +842,11 @@ class Game {
             const newPath = pathFinder.findPath(currentGrid, END_POINT, false);
 
             if (newPath && newPath.length > 1) {
+                console.log(`Враг на [${currentGrid.x}, ${currentGrid.y}] получил новый путь длиной ${newPath.length}`);
                 enemy.path = newPath;
                 enemy.pathIndex = 0;
+            } else {
+                console.log(`ОШИБКА: не найден путь для врага на [${currentGrid.x}, ${currentGrid.y}]`);
             }
         });
     }
