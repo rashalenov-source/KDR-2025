@@ -1,4 +1,5 @@
 // Игровые константы
+const GAME_VERSION = "5.3";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -1072,6 +1073,17 @@ class Game {
             this.drawTowerRange(this.selectedTower);
             this.drawUpgradeButtons();
         }
+
+        // Отображение версии в левом нижнем углу
+        this.drawVersion();
+    }
+
+    drawVersion() {
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        this.ctx.font = 'bold 14px monospace';
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'bottom';
+        this.ctx.fillText(`v${GAME_VERSION}`, 10, this.canvas.height - 10);
     }
 
     drawGrid() {
