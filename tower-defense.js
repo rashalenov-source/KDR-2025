@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "5.6";
+const GAME_VERSION = "5.7";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -261,11 +261,11 @@ class PathFinder {
                 const danger = this.dangerMap[neighborKey] || 0;
                 const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
 
-                // Добавляем +10000 за каждую опасную клетку
-                // Путь через 5 опасных клеток = 5 + 50000 = 50005
-                // Путь через 100 безопасных клеток = 100
-                // Обход ВСЕГДА дешевле!
-                const dangerPenalty = danger > 10 ? 10000 : 0;
+                // ОГРОМНЫЙ штраф за любую опасную клетку
+                // Путь через 1 опасную клетку = 1 + 1000000 = 1000001
+                // Путь через 1000 безопасных клеток = 1000
+                // Обход ВСЕГДА дешевле в 1000 раз!
+                const dangerPenalty = danger > 1 ? 1000000 : 0;
                 const moveCost = baseCost + dangerPenalty;
 
                 const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
