@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "5.4";
+const GAME_VERSION = "5.5";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -272,9 +272,9 @@ class PathFinder {
                 const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
 
                 // Если клетка опасная - делаем её НЕВЕРОЯТНО дорогой
-                // danger > 10 → стоимость x100000 (почти непроходимо)
+                // danger > 10 → стоимость x1000000 (почти непроходимо!)
                 // danger = 0 → стоимость x1 (обычная)
-                const moveCost = danger > 10 ? baseCost * 100000 : baseCost;
+                const moveCost = danger > 10 ? baseCost * 1000000 : baseCost;
 
                 const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
 
@@ -369,7 +369,7 @@ class PathFinder {
                 if (blockDangerous) {
                     const neighborKey = `${newX},${newY}`;
                     const danger = this.dangerMap[neighborKey] || 0;
-                    isBlocked = danger > 100000; // Блокируем только самый центр башни (~30% радиуса)
+                    isBlocked = danger > 50000; // Блокируем центр + средняя часть (~50% радиуса)
                 }
 
                 if (!hasTower && !isBlocked) {
