@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "5.7";
+const GAME_VERSION = "5.8";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -204,6 +204,11 @@ class PathFinder {
             }
         });
 
+        // ОТЛАДКА: проверяем dangerMap
+        const dangerCount = Object.keys(map).length;
+        const maxDanger = Math.max(...Object.values(map), 0);
+        console.log(`🗺️ DangerMap: ${dangerCount} опасных клеток, макс. опасность=${maxDanger.toFixed(0)}`);
+
         return map;
     }
 
@@ -244,7 +249,23 @@ class PathFinder {
             const currentKey = `${current.x},${current.y}`;
 
             if (currentKey === endKey) {
-                return this.reconstructPath(cameFrom, current);
+                const path = this.reconstructPath(cameFrom, current);
+
+                // ОТЛАДКА: анализируем найденный путь
+                let dangerousCells = 0;
+                let totalDanger = 0;
+                path.forEach(point => {
+                    const key = `${point.x},${point.y}`;
+                    const danger = this.dangerMap[key] || 0;
+                    if (danger > 1) {
+                        dangerousCells++;
+                        totalDanger += danger;
+                    }
+                });
+
+                console.log(`📊 Путь: длина=${path.length}, опасных клеток=${dangerousCells}, общая опасность=${totalDanger.toFixed(0)}`);
+
+                return path;
             }
 
             openSet.splice(openSet.indexOf(current), 1);
