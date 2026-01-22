@@ -215,6 +215,12 @@ class PathFinder {
         // Сначала пытаемся найти безопасный путь (блокируем опасные клетки)
         let path = this.findPathWithDangerBlocking(start, end, true);
 
+        if (path) {
+            console.log(`✅ Найден безопасный путь длиной ${path.length}`);
+        } else {
+            console.log(`❌ Безопасный путь НЕ найден, использую опасный путь`);
+        }
+
         // Если безопасный путь не найден, пытаемся с опасными клетками
         if (!path) {
             path = this.findPathWithDangerBlocking(start, end, false);
@@ -362,12 +368,12 @@ class PathFinder {
             if (newX >= 0 && newX < this.gridCols && newY >= 0 && newY < this.gridRows) {
                 const hasTower = this.towers.some(t => t.gridX === newX && t.gridY === newY);
 
-                // КРИТИЧНО: блокируем клетки с высокой опасностью
+                // КРИТИЧНО: блокируем клетки с любой опасностью
                 let isBlocked = false;
                 if (blockDangerous) {
                     const neighborKey = `${newX},${newY}`;
                     const danger = this.dangerMap[neighborKey] || 0;
-                    isBlocked = danger > 50; // Если опасность > 50, клетка непроходима (блокирует весь радиус)
+                    isBlocked = danger > 1; // Если есть хоть какая-то опасность - клетка непроходима!
                 }
 
                 if (!hasTower && !isBlocked) {
