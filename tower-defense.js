@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "5.5";
+const GAME_VERSION = "5.6";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -213,19 +213,9 @@ class PathFinder {
             return this.findRandomPath(start, end);
         }
 
-        // Сначала пытаемся найти безопасный путь (блокируем опасные клетки)
-        let path = this.findPathWithDangerBlocking(start, end, true);
-
-        if (path) {
-            console.log(`✅ Найден безопасный путь длиной ${path.length}`);
-        } else {
-            console.log(`❌ Безопасный путь НЕ найден, использую опасный путь`);
-        }
-
-        // Если безопасный путь не найден, пытаемся с опасными клетками
-        if (!path) {
-            path = this.findPathWithDangerBlocking(start, end, false);
-        }
+        // Ищем путь БЕЗ блокировки, но с огромными штрафами за опасные клетки
+        // Штраф +10000 за каждую опасную клетку заставит A* обходить башни
+        let path = this.findPathWithDangerBlocking(start, end, false);
 
         return path;
     }
@@ -267,14 +257,16 @@ class PathFinder {
 
                 if (closedSet.has(neighborKey)) continue;
 
-                // Стоимость движения: опасные клетки = ОГРОМНАЯ стоимость
+                // ФИКСИРОВАННЫЙ огромный штраф за каждую опасную клетку
                 const danger = this.dangerMap[neighborKey] || 0;
                 const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
 
-                // Если клетка опасная - делаем её НЕВЕРОЯТНО дорогой
-                // danger > 10 → стоимость x1000000 (почти непроходимо!)
-                // danger = 0 → стоимость x1 (обычная)
-                const moveCost = danger > 10 ? baseCost * 1000000 : baseCost;
+                // Добавляем +10000 за каждую опасную клетку
+                // Путь через 5 опасных клеток = 5 + 50000 = 50005
+                // Путь через 100 безопасных клеток = 100
+                // Обход ВСЕГДА дешевле!
+                const dangerPenalty = danger > 10 ? 10000 : 0;
+                const moveCost = baseCost + dangerPenalty;
 
                 const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
 
