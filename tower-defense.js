@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "5.3";
+const GAME_VERSION = "5.4";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -267,19 +267,14 @@ class PathFinder {
 
                 if (closedSet.has(neighborKey)) continue;
 
-                // Стоимость движения с ЭКСПОНЕНЦИАЛЬНЫМ ростом опасности
+                // Стоимость движения: опасные клетки = ОГРОМНАЯ стоимость
                 const danger = this.dangerMap[neighborKey] || 0;
                 const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
 
-                // ЭКСПОНЕНЦИАЛЬНЫЙ множитель с ограничением
-                // С новой базовой опасностью dps*20000:
-                // danger = 0 → множитель = 1
-                // danger = 50000 → множитель = e^10 ≈ 22000
-                // danger = 100000 → множитель = e^20 ≈ 485 млн (огромно!)
-                // danger > 100000 → множитель = 485 млн (ограничено)
-                const exponent = Math.min(danger / 5000, 20);
-                const dangerMultiplier = Math.exp(exponent);
-                const moveCost = baseCost * dangerMultiplier;
+                // Если клетка опасная - делаем её НЕВЕРОЯТНО дорогой
+                // danger > 10 → стоимость x100000 (почти непроходимо)
+                // danger = 0 → стоимость x1 (обычная)
+                const moveCost = danger > 10 ? baseCost * 100000 : baseCost;
 
                 const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
 
@@ -369,12 +364,12 @@ class PathFinder {
             if (newX >= 0 && newX < this.gridCols && newY >= 0 && newY < this.gridRows) {
                 const hasTower = this.towers.some(t => t.gridX === newX && t.gridY === newY);
 
-                // КРИТИЧНО: блокируем клетки с любой опасностью
+                // КРИТИЧНО: блокируем только центральные клетки башен
                 let isBlocked = false;
                 if (blockDangerous) {
                     const neighborKey = `${newX},${newY}`;
                     const danger = this.dangerMap[neighborKey] || 0;
-                    isBlocked = danger > 1; // Если есть хоть какая-то опасность - клетка непроходима!
+                    isBlocked = danger > 100000; // Блокируем только самый центр башни (~30% радиуса)
                 }
 
                 if (!hasTower && !isBlocked) {
