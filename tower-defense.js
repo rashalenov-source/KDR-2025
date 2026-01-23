@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "6.1";
+const GAME_VERSION = "7.0";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -400,12 +400,25 @@ class PathFinder {
             if (newX >= 0 && newX < this.gridCols && newY >= 0 && newY < this.gridRows) {
                 const hasTower = this.towers.some(t => t.gridX === newX && t.gridY === newY);
 
-                // КРИТИЧНО: блокируем только центральные клетки башен
+                // НОВЫЙ ПОДХОД: блокируем внутренние 70% радиуса каждой башни
                 let isBlocked = false;
-                if (blockDangerous) {
-                    const neighborKey = `${newX},${newY}`;
-                    const danger = this.dangerMap[neighborKey] || 0;
-                    isBlocked = danger > 50000; // Блокируем центр + средняя часть (~50% радиуса)
+
+                for (const tower of this.towers) {
+                    const type = TOWER_TYPES[tower.type];
+                    const range = type.range * (1 + (tower.rangeLevel - 1) * 0.2);
+
+                    // Расстояние от клетки до башни в пикселях
+                    const dx = (newX - tower.gridX) * GRID_SIZE;
+                    const dy = (newY - tower.gridY) * GRID_SIZE;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    // Блокируем внутренние 70% радиуса
+                    const blockRadius = range * 0.7;
+
+                    if (distance < blockRadius) {
+                        isBlocked = true;
+                        break;
+                    }
                 }
 
                 if (!hasTower && !isBlocked) {
