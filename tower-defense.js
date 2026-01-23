@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "8.5-detailed-debug";
+const GAME_VERSION = "8.6-deep-debug";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -307,6 +307,10 @@ class PathFinder {
                 console.log(`   Соседей найдено: ${neighbors.length}`);
             }
 
+            if (debugLog && iterations <= 3) {
+                console.log(`   📋 openSet ДО обработки: ${openSet.length} узлов`);
+            }
+
             for (const neighbor of neighbors) {
                 const neighborKey = `${neighbor.x},${neighbor.y}`;
 
@@ -335,17 +339,54 @@ class PathFinder {
                     safeCells++;
                 }
 
-                const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
+                const currentGScore = gScore.get(currentKey);
+                if (currentGScore === undefined && debugLog && iterations <= 3) {
+                    console.error(`⚠️⚠️⚠️ КРИТИЧНО: gScore для current [${current.x},${current.y}] = undefined!`);
+                }
 
-                if (!openSet.some(n => `${n.x},${n.y}` === neighborKey)) {
+                const tentativeGScore = (currentGScore || Infinity) + moveCost;
+                const existingGScore = gScore.get(neighborKey);
+                const inOpenSet = openSet.some(n => `${n.x},${n.y}` === neighborKey);
+
+                if (debugLog && iterations <= 3) {
+                    console.log(`       ПРОВЕРКА: inOpenSet=${inOpenSet}, existingG=${existingGScore?.toFixed(0) || 'undefined'}, tentativeG=${tentativeGScore.toFixed(0)}`);
+                }
+
+                if (!inOpenSet) {
                     openSet.push(neighbor);
-                } else if (tentativeGScore >= (gScore.get(neighborKey) || Infinity)) {
+                    if (debugLog && iterations <= 3) {
+                        console.log(`       ✅ ДОБАВЛЕН в openSet`);
+                    }
+                } else if (tentativeGScore >= (existingGScore || Infinity)) {
+                    if (debugLog && iterations <= 3) {
+                        console.log(`       ❌ ПРОПУЩЕН (не лучший путь)`);
+                    }
                     continue;
+                } else {
+                    if (debugLog && iterations <= 3) {
+                        console.log(`       ♻️ ОБНОВЛЕН (лучший путь найден)`);
+                    }
                 }
 
                 cameFrom.set(neighborKey, current);
                 gScore.set(neighborKey, tentativeGScore);
-                fScore.set(neighborKey, tentativeGScore + this.heuristic(neighbor, end));
+                const newFScore = tentativeGScore + this.heuristic(neighbor, end);
+                fScore.set(neighborKey, newFScore);
+
+                if (debugLog && iterations <= 3) {
+                    console.log(`       📝 УСТАНОВЛЕНО: gScore=${tentativeGScore.toFixed(0)}, fScore=${newFScore.toFixed(4)}`);
+                }
+            }
+
+            // ОТЛАДКА: показываем состояние openSet после обработки всех соседей
+            if (debugLog && iterations <= 3) {
+                console.log(`\n   📋 openSet ПОСЛЕ обработки (${openSet.length} узлов):`);
+                openSet.forEach(node => {
+                    const key = `${node.x},${node.y}`;
+                    const g = gScore.get(key);
+                    const f = fScore.get(key);
+                    console.log(`      [${node.x},${node.y}]: gScore=${g?.toFixed(0) || 'undefined'}, fScore=${f?.toFixed(4) || 'undefined'}`);
+                });
             }
         }
 
