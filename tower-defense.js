@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "5.8";
+const GAME_VERSION = "5.9";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -239,7 +239,15 @@ class PathFinder {
         gScore.set(startKey, 0);
         fScore.set(startKey, this.heuristic(start, end));
 
+        // ОТЛАДКА: счетчики для анализа
+        let penalizedSteps = 0;
+        let totalPenaltyApplied = 0;
+        let safeCells = 0;
+        let iterations = 0;
+
         while (openSet.length > 0) {
+            iterations++;
+
             let current = openSet.reduce((min, node) => {
                 const minKey = `${min.x},${min.y}`;
                 const nodeKey = `${node.x},${node.y}`;
@@ -263,7 +271,8 @@ class PathFinder {
                     }
                 });
 
-                console.log(`📊 Путь: длина=${path.length}, опасных клеток=${dangerousCells}, общая опасность=${totalDanger.toFixed(0)}`);
+                console.log(`📊 Путь: длина=${path.length}, опасных=${dangerousCells}, итераций=${iterations}`);
+                console.log(`   В процессе: штрафовано=${penalizedSteps} шагов, безопасных=${safeCells}, общий штраф=${totalPenaltyApplied.toFixed(0)}`);
 
                 return path;
             }
@@ -283,11 +292,21 @@ class PathFinder {
                 const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
 
                 // ОГРОМНЫЙ штраф за любую опасную клетку
-                // Путь через 1 опасную клетку = 1 + 1000000 = 1000001
-                // Путь через 1000 безопасных клеток = 1000
-                // Обход ВСЕГДА дешевле в 1000 раз!
                 const dangerPenalty = danger > 1 ? 1000000 : 0;
                 const moveCost = baseCost + dangerPenalty;
+
+                // ОТЛАДКА: считаем статистику
+                if (dangerPenalty > 0) {
+                    penalizedSteps++;
+                    totalPenaltyApplied += dangerPenalty;
+
+                    // Логируем первые 3 примера опасных клеток
+                    if (penalizedSteps <= 3) {
+                        console.log(`  ⚠️ Опасная клетка [${neighbor.x},${neighbor.y}]: danger=${danger.toFixed(0)} → штраф=${dangerPenalty}`);
+                    }
+                } else {
+                    safeCells++;
+                }
 
                 const tentativeGScore = (gScore.get(currentKey) || Infinity) + moveCost;
 
