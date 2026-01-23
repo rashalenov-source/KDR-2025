@@ -1,13 +1,12 @@
 // Игровые константы
-const GAME_VERSION = "7.2";
+const GAME_VERSION = "8.0";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
 const AUTO_WAVE_DELAY = 7000; // 7 секунд
 const PATH_RECALC_INTERVAL = 100; // Пересчет пути каждые 100мс
 
-// Стартовая и конечная точки
-const START_POINT = { x: 0, y: 7 };
+// Конечная точка (финиш)
 const END_POINT = { x: 19, y: 7 };
 
 // Типы башен
@@ -479,9 +478,32 @@ class Game {
         this.upgradeButtons = [];
         this.lastPathRecalc = 0;
 
+        // Система порталов
+        this.portals = [];
+        this.portalAnimation = 0; // Для анимации
+        this.createPortal(0, 6); // Первый портал в левой трети карты
+
         this.initEventListeners();
         this.gameLoop();
         this.scheduleNextWave();
+    }
+
+    createPortal(minX, maxX) {
+        // Создаем портал в случайной позиции
+        const x = Math.floor(Math.random() * (maxX - minX + 1)) + minX;
+        const y = Math.floor(Math.random() * GRID_ROWS);
+
+        const portal = {
+            gridX: x,
+            gridY: y,
+            x: x * GRID_SIZE + GRID_SIZE / 2,
+            y: y * GRID_SIZE + GRID_SIZE / 2,
+            active: true
+        };
+
+        this.portals.push(portal);
+        console.log(`🌀 Портал открыт в позиции [${x}, ${y}]`);
+        return portal;
     }
 
     scheduleNextWave() {
@@ -658,18 +680,24 @@ class Game {
         if (gridX < 0 || gridX >= GRID_COLS || gridY < 0 || gridY >= GRID_ROWS) return;
         if (this.towers.some(t => t.gridX === gridX && t.gridY === gridY)) return;
 
-        if ((gridX === START_POINT.x && gridY === START_POINT.y) ||
-            (gridX === END_POINT.x && gridY === END_POINT.y)) return;
+        // Нельзя строить на финише или на порталах
+        if (gridX === END_POINT.x && gridY === END_POINT.y) return;
+        if (this.portals.some(p => p.gridX === gridX && p.gridY === gridY)) {
+            alert('Нельзя строить на портале!');
+            return;
+        }
 
         // Проверяем путь БЕЗ блокирования радиусов (checkPlacementOnly = true)
-        // Блокируется только клетка самой башни, не её радиус атаки
+        // Проверяем что от КАЖДОГО портала до финиша существует путь
         const testTowers = [...this.towers, { gridX, gridY, type: this.selectedTowerType, rangeLevel: 1, damageLevel: 1, speedLevel: 1 }];
         const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, testTowers, true);
-        const testPath = pathFinder.findPath(START_POINT, END_POINT);
 
-        if (!testPath) {
-            alert('Нельзя полностью заблокировать путь врагов!');
-            return;
+        for (const portal of this.portals) {
+            const testPath = pathFinder.findPath({ x: portal.gridX, y: portal.gridY }, END_POINT);
+            if (!testPath) {
+                alert('Нельзя полностью заблокировать путь от портала!');
+                return;
+            }
         }
 
         this.towers.push({
@@ -781,11 +809,6 @@ class Game {
         }
     }
 
-    calculatePath(isScout = false) {
-        const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, this.towers);
-        return pathFinder.findPath(START_POINT, END_POINT, isScout);
-    }
-
     startWave() {
         if (this.waveInProgress || this.gameOver) return;
         if (this.wave >= WAVES.length) return;
@@ -798,7 +821,10 @@ class Game {
         this.waveInProgress = true;
         this.wave++;
 
-        this.currentPath = this.calculatePath();
+        // Открываем второй портал после 20 волны
+        if (this.wave === 20 && this.portals.length === 1) {
+            this.createPortal(7, 13); // Второй портал во второй трети карты
+        }
 
         this.spawnWave();
         this.updateUI();
@@ -837,35 +863,32 @@ class Game {
         const enemyType = ENEMY_TYPES[type];
         const isScout = enemyType.isScout;
 
-        // Разведчики стартуют с разных позиций по вертикали для разброса путей
-        let startX = START_POINT.x;
-        let startY = START_POINT.y;
+        // Выбираем случайный активный портал
+        const activePortals = this.portals.filter(p => p.active);
+        if (activePortals.length === 0) {
+            console.warn(`⚠️ Нет активных порталов для спавна врага ${type}!`);
+            return;
+        }
 
+        const portal = activePortals[Math.floor(Math.random() * activePortals.length)];
+        let startX = portal.gridX;
+        let startY = portal.gridY;
+
+        // Разведчики с небольшим смещением от портала
         if (isScout) {
-            // Случайное смещение по вертикали (±3 клетки от центра)
-            const offset = Math.floor(Math.random() * 7) - 3; // от -3 до +3
-            startY = Math.max(0, Math.min(GRID_ROWS - 1, START_POINT.y + offset));
+            const offset = Math.floor(Math.random() * 3) - 1; // -1, 0, +1
+            startY = Math.max(0, Math.min(GRID_ROWS - 1, startY + offset));
         }
 
         const startPoint = { x: startX, y: startY };
         const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, this.towers);
 
-        // ИСПРАВЛЕНИЕ: Если this.currentPath не существует, вычисляем новый путь
-        let enemyPath;
-        if (isScout) {
-            enemyPath = pathFinder.findPath(startPoint, END_POINT, true);
-        } else {
-            if (this.currentPath && Array.isArray(this.currentPath)) {
-                enemyPath = [...this.currentPath];
-            } else {
-                // Путь не определен - вычисляем новый
-                enemyPath = pathFinder.findPath(START_POINT, END_POINT, false);
-            }
-        }
+        // Вычисляем путь от портала до финиша
+        let enemyPath = pathFinder.findPath(startPoint, END_POINT, isScout);
 
         // Если путь не найден - не спавним врага
         if (!enemyPath || enemyPath.length === 0) {
-            console.warn(`⚠️ Не могу заспавнить врага ${type}: путь не найден!`);
+            console.warn(`⚠️ Не могу заспавнить врага ${type}: путь от портала [${startX},${startY}] не найден!`);
             return;
         }
 
@@ -883,7 +906,8 @@ class Game {
             gridX: startX,
             gridY: startY,
             lastPathUpdate: Date.now(),
-            isScout: isScout
+            isScout: isScout,
+            portalId: this.portals.indexOf(portal) // Запоминаем из какого портала вышел
         });
 
         this.updateUI();
@@ -1133,6 +1157,7 @@ class Game {
 
         this.drawGrid();
         // this.drawDangerMap(); // ОТКЛЮЧЕНО: тормозит игру (50-75ms на кадр)
+        this.drawPortals(); // Рисуем порталы
         this.drawPath();
         this.drawTowers();
         this.drawEnemies();
@@ -1145,6 +1170,67 @@ class Game {
 
         // Отображение версии в левом нижнем углу
         this.drawVersion();
+    }
+
+    drawPortals() {
+        this.portalAnimation += 0.05;
+
+        this.portals.forEach((portal, index) => {
+            if (!portal.active) return;
+
+            const centerX = portal.x;
+            const centerY = portal.y;
+
+            // Анимированное свечение
+            const pulse = Math.sin(this.portalAnimation + index) * 0.3 + 0.7; // 0.4 - 1.0
+
+            // Внешнее кольцо
+            const outerRadius = 25 * pulse;
+            const gradient1 = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, outerRadius);
+            gradient1.addColorStop(0, 'rgba(255, 0, 0, 0.8)');
+            gradient1.addColorStop(0.5, 'rgba(200, 0, 0, 0.5)');
+            gradient1.addColorStop(1, 'rgba(150, 0, 0, 0)');
+
+            this.ctx.fillStyle = gradient1;
+            this.ctx.beginPath();
+            this.ctx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // Внутреннее ядро
+            const coreRadius = 12;
+            const gradient2 = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, coreRadius);
+            gradient2.addColorStop(0, 'rgba(255, 100, 100, 1)');
+            gradient2.addColorStop(0.6, 'rgba(255, 0, 0, 0.9)');
+            gradient2.addColorStop(1, 'rgba(150, 0, 0, 0.5)');
+
+            this.ctx.fillStyle = gradient2;
+            this.ctx.beginPath();
+            this.ctx.arc(centerX, centerY, coreRadius, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // Вращающиеся частицы
+            const particleCount = 8;
+            for (let i = 0; i < particleCount; i++) {
+                const angle = (this.portalAnimation * 2 + i * (Math.PI * 2 / particleCount));
+                const distance = 18;
+                const px = centerX + Math.cos(angle) * distance;
+                const py = centerY + Math.sin(angle) * distance;
+
+                this.ctx.fillStyle = 'rgba(255, 50, 50, 0.8)';
+                this.ctx.beginPath();
+                this.ctx.arc(px, py, 3, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+
+            // Номер портала (если больше одного)
+            if (this.portals.length > 1) {
+                this.ctx.fillStyle = 'white';
+                this.ctx.font = 'bold 16px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText((index + 1).toString(), centerX, centerY);
+            }
+        });
     }
 
     drawVersion() {
@@ -1215,39 +1301,7 @@ class Game {
     }
 
     drawPath() {
-        if (!this.currentPath || this.currentPath.length < 2) return;
-
-        this.ctx.strokeStyle = '#8B4513';
-        this.ctx.lineWidth = GRID_SIZE * 0.6;
-        this.ctx.lineCap = 'round';
-        this.ctx.lineJoin = 'round';
-        this.ctx.globalAlpha = 0.3;
-
-        this.ctx.beginPath();
-        this.currentPath.forEach((point, index) => {
-            const x = point.x * GRID_SIZE + GRID_SIZE / 2;
-            const y = point.y * GRID_SIZE + GRID_SIZE / 2;
-
-            if (index === 0) {
-                this.ctx.moveTo(x, y);
-            } else {
-                this.ctx.lineTo(x, y);
-            }
-        });
-        this.ctx.stroke();
-        this.ctx.globalAlpha = 1;
-
-        this.ctx.fillStyle = '#4CAF50';
-        this.ctx.beginPath();
-        this.ctx.arc(
-            START_POINT.x * GRID_SIZE + GRID_SIZE / 2,
-            START_POINT.y * GRID_SIZE + GRID_SIZE / 2,
-            15,
-            0,
-            Math.PI * 2
-        );
-        this.ctx.fill();
-
+        // Рисуем только финиш (красная точка)
         this.ctx.fillStyle = '#F44336';
         this.ctx.beginPath();
         this.ctx.arc(
@@ -1258,6 +1312,11 @@ class Game {
             Math.PI * 2
         );
         this.ctx.fill();
+
+        // Рамка финиша
+        this.ctx.strokeStyle = 'white';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
     }
 
     drawTowers() {
