@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "8.8-FULL-GAMEPLAY";
+const GAME_VERSION = "8.9-MULTI-PORTAL";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -538,19 +538,38 @@ class Game {
 
     createPortal(minX, maxX) {
         // Создаем портал в случайной позиции
-        const x = Math.floor(Math.random() * (maxX - minX + 1)) + minX;
-        const y = Math.floor(Math.random() * GRID_ROWS);
+        // Проверяем, чтобы не создать портал на той же позиции, что и существующие
+        let x, y, attempts = 0;
+        let positionValid = false;
+
+        while (!positionValid && attempts < 50) {
+            x = Math.floor(Math.random() * (maxX - minX + 1)) + minX;
+            y = Math.floor(Math.random() * GRID_ROWS);
+
+            // Проверяем, что позиция свободна от других порталов и башен
+            const tooClose = this.portals.some(p =>
+                Math.abs(p.gridX - x) <= 2 && Math.abs(p.gridY - y) <= 2
+            );
+            const hasTower = this.towers.some(t => t.gridX === x && t.gridY === y);
+            const isEndPoint = x === END_POINT.x && y === END_POINT.y;
+
+            if (!tooClose && !hasTower && !isEndPoint) {
+                positionValid = true;
+            }
+            attempts++;
+        }
 
         const portal = {
             gridX: x,
             gridY: y,
             x: x * GRID_SIZE + GRID_SIZE / 2,
             y: y * GRID_SIZE + GRID_SIZE / 2,
-            active: true
+            active: true,
+            openedOnWave: this.wave
         };
 
         this.portals.push(portal);
-        console.log(`🌀 Портал открыт в позиции [${x}, ${y}]`);
+        console.log(`🌀 Портал ${this.portals.length} открыт в позиции [${x}, ${y}] на волне ${this.wave}`);
         return portal;
     }
 
@@ -868,9 +887,18 @@ class Game {
         this.waveInProgress = true;
         this.wave++;
 
-        // Открываем второй портал после 20 волны
-        if (this.wave === 20 && this.portals.length === 1) {
-            this.createPortal(7, 13); // Второй портал во второй трети карты
+        // Открываем новые порталы каждые 5 волн (максимум 3 портала)
+        // Порталы размещаются в первых 2/3 карты (0-13 колонки из 20)
+        const TWO_THIRDS = Math.floor(GRID_COLS * 2 / 3); // 13 колонок
+
+        if (this.wave === 5 && this.portals.length === 1) {
+            // Второй портал на 5-й волне (средняя треть первых 2/3)
+            this.createPortal(Math.floor(TWO_THIRDS / 3), Math.floor(TWO_THIRDS * 2 / 3));
+        }
+
+        if (this.wave === 10 && this.portals.length === 2) {
+            // Третий портал на 10-й волне (последняя треть первых 2/3)
+            this.createPortal(Math.floor(TWO_THIRDS * 2 / 3), TWO_THIRDS);
         }
 
         this.spawnWave();
@@ -879,6 +907,17 @@ class Game {
 
     spawnWave() {
         const waveConfig = WAVES[this.wave - 1];
+        const activePortalsCount = this.portals.filter(p => p.active).length;
+
+        // Если порталов несколько, распределяем врагов между ними
+        if (activePortalsCount > 1) {
+            this.spawnWaveMultiPortal(waveConfig);
+        } else {
+            this.spawnWaveSinglePortal(waveConfig);
+        }
+    }
+
+    spawnWaveSinglePortal(waveConfig) {
         let delay = 0;
 
         // Спавним разведчиков ПЕРВЫМИ - они летят впереди волны!
@@ -887,7 +926,7 @@ class Game {
                 if (!this.gameOver) {
                     this.spawnEnemy('scout');
                 }
-            }, (i * 0.3) * 1000 / this.gameSpeed); // Быстро один за другим
+            }, (i * 0.3) * 1000 / this.gameSpeed);
         }
 
         // Задержка перед основной волной
@@ -906,10 +945,51 @@ class Game {
         });
     }
 
-    spawnEnemy(type) {
-        const enemyType = ENEMY_TYPES[type];
-        const isScout = enemyType.isScout;
+    spawnWaveMultiPortal(waveConfig) {
+        const activePortals = this.portals.filter(p => p.active);
+        const portalCount = activePortals.length;
 
+        // Разведчики - по 1-2 из каждого портала с небольшим смещением
+        const scoutsPerPortal = Math.ceil(waveConfig.scoutCount / portalCount);
+        activePortals.forEach((portal, portalIndex) => {
+            const portalDelay = portalIndex * 0.5; // Смещение между порталами 0.5 сек
+
+            for (let i = 0; i < scoutsPerPortal; i++) {
+                setTimeout(() => {
+                    if (!this.gameOver) {
+                        this.spawnEnemyFromPortal('scout', portal);
+                    }
+                }, (portalDelay + i * 0.3) * 1000 / this.gameSpeed);
+            }
+        });
+
+        // Распределяем врагов между порталами
+        let globalDelay = 1.5;
+
+        waveConfig.enemies.forEach(({ type, count }) => {
+            // Делим врагов между порталами
+            const enemiesPerPortal = Math.ceil(count / portalCount);
+
+            for (let i = 0; i < count; i++) {
+                const portalIndex = i % portalCount;
+                const portal = activePortals[portalIndex];
+                const portalDelay = portalIndex * 0.3; // Небольшое смещение между порталами
+
+                setTimeout(() => {
+                    if (!this.gameOver) {
+                        this.spawnEnemyFromPortal(type, portal);
+                    }
+                }, (globalDelay + portalDelay) * 1000 / this.gameSpeed);
+
+                // Увеличиваем задержку только после того, как враг вышел из каждого портала
+                if ((i + 1) % portalCount === 0) {
+                    globalDelay += 0.8;
+                }
+            }
+        });
+    }
+
+    spawnEnemy(type) {
         // Выбираем случайный активный портал
         const activePortals = this.portals.filter(p => p.active);
         if (activePortals.length === 0) {
@@ -918,6 +998,13 @@ class Game {
         }
 
         const portal = activePortals[Math.floor(Math.random() * activePortals.length)];
+        this.spawnEnemyFromPortal(type, portal);
+    }
+
+    spawnEnemyFromPortal(type, portal) {
+        const enemyType = ENEMY_TYPES[type];
+        const isScout = enemyType.isScout;
+
         let startX = portal.gridX;
         let startY = portal.gridY;
 
