@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "6.0";
+const GAME_VERSION = "6.1";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -288,22 +288,25 @@ class PathFinder {
 
                 if (closedSet.has(neighborKey)) continue;
 
-                // ФИКСИРОВАННЫЙ огромный штраф за каждую опасную клетку
+                // ПРОПОРЦИОНАЛЬНЫЙ штраф: чем опаснее клетка, тем больше штраф
                 const danger = this.dangerMap[neighborKey] || 0;
                 const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
 
-                // ОГРОМНЫЙ штраф за любую опасную клетку
-                const dangerPenalty = danger > 1 ? 1000000 : 0;
+                // Штраф пропорционален опасности
+                // Множитель 500 делает даже слабую опасность значительной
+                // Клетка с danger=10 → штраф 5000 (vs путь 1-2)
+                // Клетка с danger=1000 → штраф 500000
+                const dangerPenalty = danger * 500;
                 const moveCost = baseCost + dangerPenalty;
 
                 // ОТЛАДКА: считаем статистику
-                if (dangerPenalty > 0) {
+                if (danger > 1) {
                     penalizedSteps++;
                     totalPenaltyApplied += dangerPenalty;
 
                     // Логируем первые 3 примера опасных клеток
                     if (penalizedSteps <= 3) {
-                        console.log(`  ⚠️ Опасная клетка [${neighbor.x},${neighbor.y}]: danger=${danger.toFixed(0)} → штраф=${dangerPenalty}`);
+                        console.log(`  ⚠️ Опасная клетка [${neighbor.x},${neighbor.y}]: danger=${danger.toFixed(0)} → штраф=${dangerPenalty.toFixed(0)}`);
                     }
                 } else {
                     safeCells++;
