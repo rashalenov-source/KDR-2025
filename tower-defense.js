@@ -25,7 +25,7 @@ const TOWER_TYPES = {
         name: 'Снайпер',
         cost: 100,
         damage: 50,
-        range: 200,
+        range: 140,
         fireRate: 2000,
         color: '#2196F3',
         projectileSpeed: 8,
@@ -1190,6 +1190,13 @@ class Game {
 
     hitTarget(proj) {
         const type = TOWER_TYPES[proj.tower.type];
+        const targetType = ENEMY_TYPES[proj.target.type];
+
+        // Снайпер слабее против бронированных целей (танки, боссы)
+        let damageMultiplier = 1.0;
+        if (proj.tower.type === 'sniper' && targetType.hasShield) {
+            damageMultiplier = 0.4; // -60% урона по бронированным целям
+        }
 
         if (type.splashRadius) {
             this.enemies.forEach(enemy => {
@@ -1207,7 +1214,7 @@ class Game {
             proj.target.slowUntil = Date.now() + type.slowDuration;
         }
 
-        proj.target.health -= proj.damage;
+        proj.target.health -= proj.damage * damageMultiplier;
     }
 
     draw() {
@@ -1216,7 +1223,7 @@ class Game {
 
         this.drawGrid();
         // this.drawDangerMap(); // ОТКЛЮЧЕНО: тормозит игру (50-75ms на кадр)
-        this.drawEnemyPaths(); // ОТЛАДКА: визуализация путей врагов
+        // this.drawEnemyPaths(); // ОТКЛЮЧЕНО: отладочная визуализация
         this.drawPortals(); // Рисуем порталы
         this.drawPath();
         this.drawTowers();
