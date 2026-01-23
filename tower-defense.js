@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "8.1";
+const GAME_VERSION = "8.2";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -192,7 +192,8 @@ class PathFinder {
                             const distanceFactor = Math.pow(1 - normalizedDist, 5);
 
                             // Базовая опасность зависит от DPS
-                            const baseDanger = dps * 20000;
+                            // РАДИКАЛЬНО УВЕЛИЧЕНО: x100 для реального обхода башен!
+                            const baseDanger = dps * 2000000;
 
                             // Итоговая опасность
                             const dangerFromTower = distanceFactor * baseDanger;
@@ -292,10 +293,9 @@ class PathFinder {
                 const baseCost = (neighbor.x !== current.x && neighbor.y !== current.y) ? 1.414 : 1;
 
                 // Штраф пропорционален опасности
-                // Множитель 500 делает даже слабую опасность значительной
-                // Клетка с danger=10 → штраф 5000 (vs путь 1-2)
-                // Клетка с danger=1000 → штраф 500000
-                const dangerPenalty = danger * 500;
+                // РАДИКАЛЬНО УВЕЛИЧЕНО: x100 для РЕАЛЬНОГО обхода башен!
+                // Теперь даже слабая башня создает огромный штраф
+                const dangerPenalty = danger * 50000;
                 const moveCost = baseCost + dangerPenalty;
 
                 // ОТЛАДКА: считаем статистику
