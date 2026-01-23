@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "8.0";
+const GAME_VERSION = "8.1";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -150,11 +150,10 @@ for (let i = 0; i < 15; i++) {
 
 // A* pathfinding с агрессивным избеганием башен
 class PathFinder {
-    constructor(gridCols, gridRows, towers, checkPlacementOnly = false) {
+    constructor(gridCols, gridRows, towers) {
         this.gridCols = gridCols;
         this.gridRows = gridRows;
         this.towers = towers;
-        this.checkPlacementOnly = checkPlacementOnly; // Режим проверки установки башни
         this.dangerMap = this.buildDangerMap();
     }
 
@@ -400,31 +399,11 @@ class PathFinder {
             if (newX >= 0 && newX < this.gridCols && newY >= 0 && newY < this.gridRows) {
                 const hasTower = this.towers.some(t => t.gridX === newX && t.gridY === newY);
 
-                // НОВЫЙ ПОДХОД: блокируем внутренние 70% радиуса каждой башни
-                // НО: при проверке установки башни (checkPlacementOnly) не блокируем радиусы!
-                let isBlocked = false;
+                // ИСПРАВЛЕНО: радиус урона башни НЕ блокирует путь!
+                // Только сама башня является препятствием.
+                // Система штрафов (dangerMap) уже заставляет врагов избегать опасных зон.
 
-                if (!this.checkPlacementOnly) {
-                    for (const tower of this.towers) {
-                        const type = TOWER_TYPES[tower.type];
-                        const range = type.range * (1 + (tower.rangeLevel - 1) * 0.2);
-
-                        // Расстояние от клетки до башни в пикселях
-                        const dx = (newX - tower.gridX) * GRID_SIZE;
-                        const dy = (newY - tower.gridY) * GRID_SIZE;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-
-                        // Блокируем внутренние 50% радиуса (было 70% - слишком много!)
-                        const blockRadius = range * 0.5;
-
-                        if (distance < blockRadius) {
-                            isBlocked = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (!hasTower && !isBlocked) {
+                if (!hasTower) {
                     neighbors.push({ x: newX, y: newY });
                 }
             }
@@ -687,10 +666,9 @@ class Game {
             return;
         }
 
-        // Проверяем путь БЕЗ блокирования радиусов (checkPlacementOnly = true)
         // Проверяем что от КАЖДОГО портала до финиша существует путь
         const testTowers = [...this.towers, { gridX, gridY, type: this.selectedTowerType, rangeLevel: 1, damageLevel: 1, speedLevel: 1 }];
-        const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, testTowers, true);
+        const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, testTowers);
 
         for (const portal of this.portals) {
             const testPath = pathFinder.findPath({ x: portal.gridX, y: portal.gridY }, END_POINT);
