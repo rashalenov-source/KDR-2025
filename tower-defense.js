@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "8.2";
+const GAME_VERSION = "8.3-debug";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -1135,6 +1135,7 @@ class Game {
 
         this.drawGrid();
         // this.drawDangerMap(); // ОТКЛЮЧЕНО: тормозит игру (50-75ms на кадр)
+        this.drawEnemyPaths(); // ОТЛАДКА: визуализация путей врагов
         this.drawPortals(); // Рисуем порталы
         this.drawPath();
         this.drawTowers();
@@ -1148,6 +1149,43 @@ class Game {
 
         // Отображение версии в левом нижнем углу
         this.drawVersion();
+    }
+
+    drawEnemyPaths() {
+        // ОТЛАДКА: рисуем пути всех врагов
+        this.enemies.forEach((enemy, index) => {
+            if (!enemy.path) return;
+
+            // Разные цвета для разных врагов
+            const colors = ['rgba(255, 255, 0, 0.5)', 'rgba(0, 255, 255, 0.5)', 'rgba(255, 0, 255, 0.5)', 'rgba(255, 128, 0, 0.5)'];
+            this.ctx.strokeStyle = colors[index % colors.length];
+            this.ctx.lineWidth = 2;
+
+            this.ctx.beginPath();
+            for (let i = 0; i < enemy.path.length; i++) {
+                const point = enemy.path[i];
+                const x = point.x * GRID_SIZE + GRID_SIZE / 2;
+                const y = point.y * GRID_SIZE + GRID_SIZE / 2;
+
+                if (i === 0) {
+                    this.ctx.moveTo(x, y);
+                } else {
+                    this.ctx.lineTo(x, y);
+                }
+            }
+            this.ctx.stroke();
+
+            // Рисуем точки на пути
+            enemy.path.forEach((point, i) => {
+                const x = point.x * GRID_SIZE + GRID_SIZE / 2;
+                const y = point.y * GRID_SIZE + GRID_SIZE / 2;
+
+                this.ctx.fillStyle = i === enemy.pathIndex ? 'lime' : 'yellow';
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, 3, 0, Math.PI * 2);
+                this.ctx.fill();
+            });
+        });
     }
 
     drawPortals() {
