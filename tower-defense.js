@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "8.4";
+const GAME_VERSION = "8.5-detailed-debug";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -108,42 +108,41 @@ const ENEMY_TYPES = {
     }
 };
 
-// Генерация волн: 7 монстров в первой, +3 каждую следующую
+// ОТЛАДКА: упрощенные волны - по 1 монстру каждого типа для изучения путей
 const WAVES = [];
 for (let i = 0; i < 15; i++) {
-    const enemyCount = 7 + i * 3;
     const wave = { enemies: [] };
 
     if (i === 0) {
-        wave.enemies.push({ type: 'basic', count: enemyCount });
+        wave.enemies.push({ type: 'basic', count: 1 });
     } else if (i < 3) {
         wave.enemies.push(
-            { type: 'basic', count: Math.floor(enemyCount * 0.7) },
-            { type: 'fast', count: Math.floor(enemyCount * 0.3) }
+            { type: 'basic', count: 1 },
+            { type: 'fast', count: 1 }
         );
     } else if (i < 6) {
         wave.enemies.push(
-            { type: 'basic', count: Math.floor(enemyCount * 0.5) },
-            { type: 'fast', count: Math.floor(enemyCount * 0.3) },
-            { type: 'tank', count: Math.floor(enemyCount * 0.2) }
+            { type: 'basic', count: 1 },
+            { type: 'fast', count: 1 },
+            { type: 'tank', count: 1 }
         );
     } else if (i < 10) {
         wave.enemies.push(
-            { type: 'basic', count: Math.floor(enemyCount * 0.4) },
-            { type: 'fast', count: Math.floor(enemyCount * 0.3) },
-            { type: 'tank', count: Math.floor(enemyCount * 0.3) }
+            { type: 'basic', count: 1 },
+            { type: 'fast', count: 1 },
+            { type: 'tank', count: 1 }
         );
     } else {
         wave.enemies.push(
-            { type: 'basic', count: Math.floor(enemyCount * 0.3) },
-            { type: 'fast', count: Math.floor(enemyCount * 0.3) },
-            { type: 'tank', count: Math.floor(enemyCount * 0.3) },
-            { type: 'boss', count: Math.max(1, Math.floor(enemyCount * 0.1)) }
+            { type: 'basic', count: 1 },
+            { type: 'fast', count: 1 },
+            { type: 'tank', count: 1 },
+            { type: 'boss', count: 1 }
         );
     }
 
-    // Добавляем 4 разведчика в середину волны
-    wave.scoutCount = 4;
+    // Отключаем разведчиков для отладки
+    wave.scoutCount = 0;
 
     WAVES.push(wave);
 }
@@ -213,7 +212,7 @@ class PathFinder {
         return map;
     }
 
-    findPath(start, end, isScout = false) {
+    findPath(start, end, isScout = false, debugLog = false) {
         // Разведчики идут случайным путем
         if (isScout) {
             return this.findRandomPath(start, end);
@@ -221,12 +220,12 @@ class PathFinder {
 
         // Ищем путь БЕЗ блокировки, но с огромными штрафами за опасные клетки
         // Штраф +10000 за каждую опасную клетку заставит A* обходить башни
-        let path = this.findPathWithDangerBlocking(start, end, false);
+        let path = this.findPathWithDangerBlocking(start, end, false, debugLog);
 
         return path;
     }
 
-    findPathWithDangerBlocking(start, end, blockDangerous) {
+    findPathWithDangerBlocking(start, end, blockDangerous, debugLog = false) {
         const openSet = [];
         const closedSet = new Set();
         const cameFrom = new Map();
@@ -245,6 +244,12 @@ class PathFinder {
         let totalPenaltyApplied = 0;
         let safeCells = 0;
         let iterations = 0;
+
+        if (debugLog) {
+            console.log(`\n🔍 ДЕТАЛЬНЫЙ РАСЧЕТ ПУТИ: [${start.x},${start.y}] → [${end.x},${end.y}]`);
+            console.log(`📊 Башен на карте: ${this.towers.length}`);
+            console.log(`🗺️ Опасных клеток в dangerMap: ${Object.keys(this.dangerMap).length}`);
+        }
 
         while (openSet.length > 0) {
             iterations++;
@@ -275,13 +280,32 @@ class PathFinder {
                 console.log(`📊 Путь: длина=${path.length}, опасных=${dangerousCells}, итераций=${iterations}`);
                 console.log(`   В процессе: штрафовано=${penalizedSteps} шагов, безопасных=${safeCells}, общий штраф=${totalPenaltyApplied.toFixed(0)}`);
 
+                if (debugLog) {
+                    console.log(`\n✅ ПУТЬ НАЙДЕН! Детали:`);
+                    path.forEach((p, i) => {
+                        const key = `${p.x},${p.y}`;
+                        const danger = this.dangerMap[key] || 0;
+                        console.log(`   ${i}. [${p.x},${p.y}] danger=${danger.toFixed(1)}`);
+                    });
+                }
+
                 return path;
+            }
+
+            // ОТЛАДКА: детальное логирование первых 15 итераций
+            if (debugLog && iterations <= 15) {
+                console.log(`\n--- Итерация ${iterations} ---`);
+                console.log(`🎯 Текущая клетка: [${current.x},${current.y}], gScore=${gScore.get(currentKey).toFixed(2)}`);
             }
 
             openSet.splice(openSet.indexOf(current), 1);
             closedSet.add(currentKey);
 
             const neighbors = this.getNeighbors(current, blockDangerous);
+
+            if (debugLog && iterations <= 15) {
+                console.log(`   Соседей найдено: ${neighbors.length}`);
+            }
 
             for (const neighbor of neighbors) {
                 const neighborKey = `${neighbor.x},${neighbor.y}`;
@@ -298,15 +322,15 @@ class PathFinder {
                 const dangerPenalty = danger * 50000;
                 const moveCost = baseCost + dangerPenalty;
 
+                // ОТЛАДКА: детальное логирование соседей
+                if (debugLog && iterations <= 15) {
+                    console.log(`     → [${neighbor.x},${neighbor.y}]: base=${baseCost.toFixed(2)}, danger=${danger.toFixed(1)}, penalty=${dangerPenalty.toFixed(0)}, total=${moveCost.toFixed(0)}`);
+                }
+
                 // ОТЛАДКА: считаем статистику
                 if (danger > 1) {
                     penalizedSteps++;
                     totalPenaltyApplied += dangerPenalty;
-
-                    // Логируем первые 3 примера опасных клеток
-                    if (penalizedSteps <= 3) {
-                        console.log(`  ⚠️ Опасная клетка [${neighbor.x},${neighbor.y}]: danger=${danger.toFixed(0)} → штраф=${dangerPenalty.toFixed(0)}`);
-                    }
                 } else {
                     safeCells++;
                 }
@@ -864,8 +888,14 @@ class Game {
         const startPoint = { x: startX, y: startY };
         const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, this.towers);
 
+        // ОТЛАДКА: включаем детальное логирование для первого монстра в волне
+        const debugLog = this.enemies.length === 0;
+        if (debugLog) {
+            console.log(`\n🔬 ===== ОТЛАДКА ПЕРВОГО МОНСТРА ${type.toUpperCase()} =====`);
+        }
+
         // Вычисляем путь от портала до финиша
-        let enemyPath = pathFinder.findPath(startPoint, END_POINT, isScout);
+        let enemyPath = pathFinder.findPath(startPoint, END_POINT, isScout, debugLog);
 
         // Если путь не найден - не спавним врага
         if (!enemyPath || enemyPath.length === 0) {
@@ -936,7 +966,7 @@ class Game {
 
     recalculateEnemyPaths() {
         // Пересчитываем пути для всех врагов
-        this.enemies.forEach(enemy => {
+        this.enemies.forEach((enemy, index) => {
             if (enemy.isScout) {
                 // Разведчики не пересчитывают путь
                 return;
@@ -947,8 +977,14 @@ class Game {
                 y: Math.floor(enemy.y / GRID_SIZE)
             };
 
+            // ОТЛАДКА: логируем пересчет для первого врага
+            const debugLog = index === 0;
+            if (debugLog) {
+                console.log(`\n🔄 ===== ПЕРЕСЧЕТ ПУТИ (${enemy.type.toUpperCase()}) =====`);
+            }
+
             const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, this.towers);
-            const newPath = pathFinder.findPath(currentGrid, END_POINT, false);
+            const newPath = pathFinder.findPath(currentGrid, END_POINT, false, debugLog);
 
             if (newPath && newPath.length > 1) {
                 enemy.path = newPath;
