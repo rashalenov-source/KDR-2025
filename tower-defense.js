@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "5.9";
+const GAME_VERSION = "6.0";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -170,8 +170,9 @@ class PathFinder {
             // DPS башни
             const dps = damage / (fireRate / 1000);
 
-            const rangeInCells = Math.ceil((range + 60) / GRID_SIZE); // +60 для большего отступа
-            const effectiveRange = range + 60; // ИСПРАВЛЕНИЕ: используем расширенный радиус
+            // ИСПРАВЛЕНИЕ: используем ТОЛЬКО реальный радиус атаки, без раздувания!
+            const rangeInCells = Math.ceil(range / GRID_SIZE);
+            const effectiveRange = range; // Реальный радиус, без +60!
 
             for (let dx = -rangeInCells; dx <= rangeInCells; dx++) {
                 for (let dy = -rangeInCells; dy <= rangeInCells; dy++) {
@@ -181,17 +182,17 @@ class PathFinder {
                     if (x >= 0 && x < this.gridCols && y >= 0 && y < this.gridRows) {
                         const dist = Math.sqrt(dx * dx + dy * dy) * GRID_SIZE;
 
-                        if (dist <= effectiveRange) { // ИСПРАВЛЕНИЕ: сравниваем с расширенным радиусом!
+                        if (dist <= effectiveRange) {
                             const key = `${x},${y}`;
 
                             // Нормализованное расстояние (0 = в центре, 1 = на краю)
                             const normalizedDist = dist / effectiveRange;
 
-                            // ЭКСТРЕМАЛЬНАЯ опасность: чем ближе к башне, тем НЕВЕРОЯТНО опаснее
-                            // Используем степень 5 для очень резкого роста
+                            // ЭКСТРЕМАЛЬНАЯ опасность: чем ближе к башне, тем опаснее
+                            // Степень 5 для резкого роста ближе к центру
                             const distanceFactor = Math.pow(1 - normalizedDist, 5);
 
-                            // Базовая опасность зависит от DPS - РАДИКАЛЬНО увеличена в 10 раз!
+                            // Базовая опасность зависит от DPS
                             const baseDanger = dps * 20000;
 
                             // Итоговая опасность
