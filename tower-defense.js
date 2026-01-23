@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "8.7-CRITICAL-FIX";
+const GAME_VERSION = "8.8-FULL-GAMEPLAY";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -108,41 +108,42 @@ const ENEMY_TYPES = {
     }
 };
 
-// ОТЛАДКА: упрощенные волны - по 1 монстру каждого типа для изучения путей
+// Волны врагов - полноценный геймплей
 const WAVES = [];
 for (let i = 0; i < 15; i++) {
+    const enemyCount = 7 + i * 3;
     const wave = { enemies: [] };
 
     if (i === 0) {
-        wave.enemies.push({ type: 'basic', count: 1 });
+        wave.enemies.push({ type: 'basic', count: enemyCount });
     } else if (i < 3) {
         wave.enemies.push(
-            { type: 'basic', count: 1 },
-            { type: 'fast', count: 1 }
+            { type: 'basic', count: Math.floor(enemyCount * 0.7) },
+            { type: 'fast', count: Math.floor(enemyCount * 0.3) }
         );
     } else if (i < 6) {
         wave.enemies.push(
-            { type: 'basic', count: 1 },
-            { type: 'fast', count: 1 },
-            { type: 'tank', count: 1 }
+            { type: 'basic', count: Math.floor(enemyCount * 0.5) },
+            { type: 'fast', count: Math.floor(enemyCount * 0.3) },
+            { type: 'tank', count: Math.floor(enemyCount * 0.2) }
         );
     } else if (i < 10) {
         wave.enemies.push(
-            { type: 'basic', count: 1 },
-            { type: 'fast', count: 1 },
-            { type: 'tank', count: 1 }
+            { type: 'basic', count: Math.floor(enemyCount * 0.4) },
+            { type: 'fast', count: Math.floor(enemyCount * 0.3) },
+            { type: 'tank', count: Math.floor(enemyCount * 0.3) }
         );
     } else {
         wave.enemies.push(
-            { type: 'basic', count: 1 },
-            { type: 'fast', count: 1 },
-            { type: 'tank', count: 1 },
-            { type: 'boss', count: 1 }
+            { type: 'basic', count: Math.floor(enemyCount * 0.3) },
+            { type: 'fast', count: Math.floor(enemyCount * 0.3) },
+            { type: 'tank', count: Math.floor(enemyCount * 0.3) },
+            { type: 'boss', count: Math.max(1, Math.floor(enemyCount * 0.1)) }
         );
     }
 
-    // Отключаем разведчиков для отладки
-    wave.scoutCount = 0;
+    // Добавляем 4 разведчика в середину волны
+    wave.scoutCount = 4;
 
     WAVES.push(wave);
 }
