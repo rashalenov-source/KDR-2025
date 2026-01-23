@@ -1078,9 +1078,18 @@ class Game {
             this.lastPathRecalc = now;
         }
 
-        this.updateEnemies(adjustedDelta);
+        // Разбиваем большие deltaTime на маленькие шаги для плавного движения
+        // Максимальный шаг = 20мс, чтобы избежать подергиваний на высоких скоростях
+        const maxStep = 20;
+        const steps = Math.ceil(adjustedDelta / maxStep);
+        const stepDelta = adjustedDelta / steps;
+
+        for (let i = 0; i < steps; i++) {
+            this.updateEnemies(stepDelta);
+            this.updateProjectiles(stepDelta);
+        }
+
         this.updateTowers(now);
-        this.updateProjectiles(adjustedDelta);
 
         if (this.waveInProgress && this.enemies.length === 0) {
             this.waveInProgress = false;
@@ -1189,12 +1198,7 @@ class Game {
                 enemy.gridY = Math.floor(enemy.y / GRID_SIZE);
             }
 
-            if (enemy.health <= 0) {
-                this.money += enemyType.reward;
-                this.score += enemyType.reward * 10;
-                this.enemies.splice(i, 1);
-                this.updateUI();
-            }
+            // Проверка на смерть удалена - враги теперь уничтожаются моментально при получении урона в hitTarget()
         }
     }
 
@@ -1285,23 +1289,49 @@ class Game {
             damageMultiplier = 0.4; // -60% урона по бронированным целям
         }
 
+        // Сплэш-урон по окружающим врагам
         if (type.splashRadius) {
-            this.enemies.forEach(enemy => {
+            for (let i = this.enemies.length - 1; i >= 0; i--) {
+                const enemy = this.enemies[i];
                 const dx = enemy.x - proj.target.x;
                 const dy = enemy.y - proj.target.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
                 if (distance < type.splashRadius) {
-                    enemy.health -= proj.damage * 0.7;
+                    const splashDamage = proj.damage * 0.7;
+                    // Проверяем, убьет ли сплэш-урон врага
+                    if (enemy.health <= splashDamage) {
+                        const enemyType = ENEMY_TYPES[enemy.type];
+                        this.money += enemyType.reward;
+                        this.score += enemyType.reward * 10;
+                        this.enemies.splice(i, 1);
+                    } else {
+                        enemy.health -= splashDamage;
+                    }
                 }
-            });
+            }
         }
 
         if (type.slowEffect) {
             proj.target.slowUntil = Date.now() + type.slowDuration;
         }
 
-        proj.target.health -= proj.damage * damageMultiplier;
+        // Проверяем, убьет ли урон основную цель
+        const finalDamage = proj.damage * damageMultiplier;
+        if (proj.target.health <= finalDamage) {
+            // Моментально убиваем врага без анимации уменьшения HP
+            const enemyIndex = this.enemies.indexOf(proj.target);
+            if (enemyIndex !== -1) {
+                this.money += targetType.reward;
+                this.score += targetType.reward * 10;
+                this.enemies.splice(enemyIndex, 1);
+            }
+        } else {
+            // Только если враг выживет - уменьшаем HP
+            proj.target.health -= finalDamage;
+        }
+
+        this.updateUI();
     }
 
     draw() {
