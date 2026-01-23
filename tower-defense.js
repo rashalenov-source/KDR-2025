@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "7.0";
+const GAME_VERSION = "7.1";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -151,10 +151,11 @@ for (let i = 0; i < 15; i++) {
 
 // A* pathfinding с агрессивным избеганием башен
 class PathFinder {
-    constructor(gridCols, gridRows, towers) {
+    constructor(gridCols, gridRows, towers, checkPlacementOnly = false) {
         this.gridCols = gridCols;
         this.gridRows = gridRows;
         this.towers = towers;
+        this.checkPlacementOnly = checkPlacementOnly; // Режим проверки установки башни
         this.dangerMap = this.buildDangerMap();
     }
 
@@ -401,23 +402,26 @@ class PathFinder {
                 const hasTower = this.towers.some(t => t.gridX === newX && t.gridY === newY);
 
                 // НОВЫЙ ПОДХОД: блокируем внутренние 70% радиуса каждой башни
+                // НО: при проверке установки башни (checkPlacementOnly) не блокируем радиусы!
                 let isBlocked = false;
 
-                for (const tower of this.towers) {
-                    const type = TOWER_TYPES[tower.type];
-                    const range = type.range * (1 + (tower.rangeLevel - 1) * 0.2);
+                if (!this.checkPlacementOnly) {
+                    for (const tower of this.towers) {
+                        const type = TOWER_TYPES[tower.type];
+                        const range = type.range * (1 + (tower.rangeLevel - 1) * 0.2);
 
-                    // Расстояние от клетки до башни в пикселях
-                    const dx = (newX - tower.gridX) * GRID_SIZE;
-                    const dy = (newY - tower.gridY) * GRID_SIZE;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
+                        // Расстояние от клетки до башни в пикселях
+                        const dx = (newX - tower.gridX) * GRID_SIZE;
+                        const dy = (newY - tower.gridY) * GRID_SIZE;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
 
-                    // Блокируем внутренние 70% радиуса
-                    const blockRadius = range * 0.7;
+                        // Блокируем внутренние 70% радиуса
+                        const blockRadius = range * 0.7;
 
-                    if (distance < blockRadius) {
-                        isBlocked = true;
-                        break;
+                        if (distance < blockRadius) {
+                            isBlocked = true;
+                            break;
+                        }
                     }
                 }
 
@@ -657,8 +661,10 @@ class Game {
         if ((gridX === START_POINT.x && gridY === START_POINT.y) ||
             (gridX === END_POINT.x && gridY === END_POINT.y)) return;
 
+        // Проверяем путь БЕЗ блокирования радиусов (checkPlacementOnly = true)
+        // Блокируется только клетка самой башни, не её радиус атаки
         const testTowers = [...this.towers, { gridX, gridY, type: this.selectedTowerType, rangeLevel: 1, damageLevel: 1, speedLevel: 1 }];
-        const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, testTowers);
+        const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, testTowers, true);
         const testPath = pathFinder.findPath(START_POINT, END_POINT);
 
         if (!testPath) {
