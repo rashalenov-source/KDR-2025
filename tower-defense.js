@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "8.3-debug";
+const GAME_VERSION = "8.4";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -413,7 +413,10 @@ class PathFinder {
     }
 
     heuristic(a, b) {
-        return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+        // КРИТИЧНО: эвристика умножена на 0.00001 чтобы не влиять на выбор пути!
+        // Теперь алгоритм ищет БЕЗОПАСНЫЙ путь, а не КОРОТКИЙ.
+        // Штрафы за башни (миллионы) >> расстояние (десятки)
+        return (Math.abs(a.x - b.x) + Math.abs(a.y - b.y)) * 0.00001;
     }
 
     reconstructPath(cameFrom, current) {
