@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "7.1";
+const GAME_VERSION = "7.2";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -415,8 +415,8 @@ class PathFinder {
                         const dy = (newY - tower.gridY) * GRID_SIZE;
                         const distance = Math.sqrt(dx * dx + dy * dy);
 
-                        // Блокируем внутренние 70% радиуса
-                        const blockRadius = range * 0.7;
+                        // Блокируем внутренние 50% радиуса (было 70% - слишком много!)
+                        const blockRadius = range * 0.5;
 
                         if (distance < blockRadius) {
                             isBlocked = true;
@@ -850,13 +850,32 @@ class Game {
         const startPoint = { x: startX, y: startY };
         const pathFinder = new PathFinder(GRID_COLS, GRID_ROWS, this.towers);
 
+        // ИСПРАВЛЕНИЕ: Если this.currentPath не существует, вычисляем новый путь
+        let enemyPath;
+        if (isScout) {
+            enemyPath = pathFinder.findPath(startPoint, END_POINT, true);
+        } else {
+            if (this.currentPath && Array.isArray(this.currentPath)) {
+                enemyPath = [...this.currentPath];
+            } else {
+                // Путь не определен - вычисляем новый
+                enemyPath = pathFinder.findPath(START_POINT, END_POINT, false);
+            }
+        }
+
+        // Если путь не найден - не спавним врага
+        if (!enemyPath || enemyPath.length === 0) {
+            console.warn(`⚠️ Не могу заспавнить врага ${type}: путь не найден!`);
+            return;
+        }
+
         this.enemies.push({
             type,
             health: enemyType.health,
             maxHealth: enemyType.health,
             speed: enemyType.speed,
             pathIndex: 0,
-            path: isScout ? pathFinder.findPath(startPoint, END_POINT, true) : [...this.currentPath],
+            path: enemyPath,
             x: startX * GRID_SIZE + GRID_SIZE / 2,
             y: startY * GRID_SIZE + GRID_SIZE / 2,
             slowEffect: 1,
