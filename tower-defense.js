@@ -1,5 +1,5 @@
 // Игровые константы
-const GAME_VERSION = "8.6-deep-debug";
+const GAME_VERSION = "8.7-CRITICAL-FIX";
 const GRID_SIZE = 40;
 const GRID_COLS = 20;
 const GRID_ROWS = 15;
@@ -344,7 +344,7 @@ class PathFinder {
                     console.error(`⚠️⚠️⚠️ КРИТИЧНО: gScore для current [${current.x},${current.y}] = undefined!`);
                 }
 
-                const tentativeGScore = (currentGScore || Infinity) + moveCost;
+                const tentativeGScore = (currentGScore ?? Infinity) + moveCost;
                 const existingGScore = gScore.get(neighborKey);
                 const inOpenSet = openSet.some(n => `${n.x},${n.y}` === neighborKey);
 
@@ -357,7 +357,7 @@ class PathFinder {
                     if (debugLog && iterations <= 3) {
                         console.log(`       ✅ ДОБАВЛЕН в openSet`);
                     }
-                } else if (tentativeGScore >= (existingGScore || Infinity)) {
+                } else if (tentativeGScore >= (existingGScore ?? Infinity)) {
                     if (debugLog && iterations <= 3) {
                         console.log(`       ❌ ПРОПУЩЕН (не лучший путь)`);
                     }
