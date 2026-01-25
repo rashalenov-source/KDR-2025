@@ -1,0 +1,130 @@
+[gd_scene load_steps=3 format=2]
+
+[ext_resource path="res://scripts/Main.gd" type="Script" id=1]
+[ext_resource path="res://scripts/UI.gd" type="Script" id=2]
+
+[node name="Main" type="Node2D"]
+script = ExtResource( 1 )
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2( 400, 300 )
+current = true
+
+[node name="GameBoard" type="Node2D" parent="."]
+
+[node name="GridLayer" type="Node2D" parent="GameBoard"]
+
+[node name="PortalsLayer" type="Node2D" parent="GameBoard"]
+
+[node name="TowersLayer" type="Node2D" parent="GameBoard"]
+
+[node name="EnemiesLayer" type="Node2D" parent="GameBoard"]
+
+[node name="ProjectilesLayer" type="Node2D" parent="GameBoard"]
+
+[node name="EndPoint" type="ColorRect" parent="GameBoard"]
+margin_left = 760.0
+margin_top = 260.0
+margin_right = 800.0
+margin_bottom = 340.0
+color = Color( 1, 0.843137, 0, 1 )
+
+[node name="UI" type="CanvasLayer" parent="."]
+script = ExtResource( 2 )
+
+[node name="TopBar" type="Panel" parent="UI"]
+margin_right = 800.0
+margin_bottom = 60.0
+
+[node name="MoneyLabel" type="Label" parent="UI/TopBar"]
+margin_left = 20.0
+margin_top = 10.0
+margin_right = 150.0
+margin_bottom = 30.0
+text = "Money: $200"
+
+[node name="LivesLabel" type="Label" parent="UI/TopBar"]
+margin_left = 20.0
+margin_top = 30.0
+margin_right = 150.0
+margin_bottom = 50.0
+text = "Lives: 20"
+
+[node name="WaveLabel" type="Label" parent="UI/TopBar"]
+margin_left = 200.0
+margin_top = 10.0
+margin_right = 350.0
+margin_bottom = 30.0
+text = "Wave: 0/15"
+
+[node name="ScoreLabel" type="Label" parent="UI/TopBar"]
+margin_left = 200.0
+margin_top = 30.0
+margin_right = 350.0
+margin_bottom = 50.0
+text = "Score: 0"
+
+[node name="StartWaveButton" type="Button" parent="UI/TopBar"]
+margin_left = 650.0
+margin_top = 10.0
+margin_right = 780.0
+margin_bottom = 50.0
+text = "Start Wave"
+
+[node name="RightPanel" type="Panel" parent="UI"]
+margin_left = 600.0
+margin_top = 70.0
+margin_right = 790.0
+margin_bottom = 590.0
+
+[node name="TowerButtons" type="VBoxContainer" parent="UI/RightPanel"]
+margin_left = 10.0
+margin_top = 10.0
+margin_right = 180.0
+margin_bottom = 500.0
+
+[node name="BasicTowerButton" type="Button" parent="UI/RightPanel/TowerButtons"]
+margin_right = 170.0
+margin_bottom = 60.0
+rect_min_size = Vector2( 170, 60 )
+text = "Basic Tower
+$50"
+
+[node name="SniperTowerButton" type="Button" parent="UI/RightPanel/TowerButtons"]
+margin_top = 64.0
+margin_right = 170.0
+margin_bottom = 124.0
+rect_min_size = Vector2( 170, 60 )
+text = "Sniper Tower
+$100"
+
+[node name="CannonTowerButton" type="Button" parent="UI/RightPanel/TowerButtons"]
+margin_top = 128.0
+margin_right = 170.0
+margin_bottom = 188.0
+rect_min_size = Vector2( 170, 60 )
+text = "Cannon Tower
+$150"
+
+[node name="FreezeTowerButton" type="Button" parent="UI/RightPanel/TowerButtons"]
+margin_top = 192.0
+margin_right = 170.0
+margin_bottom = 252.0
+rect_min_size = Vector2( 170, 60 )
+text = "Freeze Tower
+$120"
+
+[node name="SellButton" type="Button" parent="UI/RightPanel/TowerButtons"]
+margin_top = 256.0
+margin_right = 170.0
+margin_bottom = 296.0
+rect_min_size = Vector2( 170, 40 )
+disabled = true
+text = "Sell Tower"
+
+[node name="VersionLabel" type="Label" parent="UI"]
+margin_left = 10.0
+margin_top = 570.0
+margin_right = 150.0
+margin_bottom = 590.0
+text = "v1.0-GODOT"
