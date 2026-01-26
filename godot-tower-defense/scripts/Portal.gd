@@ -12,8 +12,11 @@ onready var animation_timer = $AnimationTimer
 var particle_circles = []
 
 func _ready():
+	# warning-ignore:return_value_discarded
 	animation_timer.connect("timeout", self, "_on_animation_tick")
 	_create_particle_circles()
+	animation_timer.start()  # Запускаем таймер вручную после инициализации
+	_update_portal_visuals()  # Начальная отрисовка
 
 func _create_particle_circles():
 	# Создаем 8 вращающихся частиц
@@ -30,6 +33,10 @@ func _on_animation_tick():
 	_update_portal_visuals()
 
 func _update_portal_visuals():
+	# Проверка на null для безопасности
+	if not is_instance_valid(outer_ring) or not is_instance_valid(core):
+		return
+
 	# Пульсация от 0.4 до 1.0
 	var pulse = 0.4 + 0.6 * (sin(pulse_time * pulse_speed * PI) * 0.5 + 0.5)
 

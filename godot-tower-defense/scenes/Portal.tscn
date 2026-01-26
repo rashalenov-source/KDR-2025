@@ -13,4 +13,3 @@ script = ExtResource( 1 )
 
 [node name="AnimationTimer" type="Timer" parent="."]
 wait_time = 0.05
-autostart = true

@@ -33,8 +33,11 @@ func _ready():
 	pathfinder.initialize(GameManager.GRID_COLS, GameManager.GRID_ROWS, towers)
 
 	# Подключение UI
+	# warning-ignore:return_value_discarded
 	$UI.connect("tower_selected", self, "_on_tower_type_selected")
+	# warning-ignore:return_value_discarded
 	$UI.connect("start_wave_pressed", self, "_on_start_wave_pressed")
+	# warning-ignore:return_value_discarded
 	$UI.connect("sell_tower_pressed", self, "_on_sell_tower_pressed")
 
 	print("Main scene ready!")
@@ -226,8 +229,6 @@ func _start_wave():
 	$UI.update_ui()
 
 func _check_new_portals():
-	var two_thirds = floor(GameManager.GRID_COLS * 2.0 / 3.0)  # 13 колонок
-
 	if GameManager.wave == 5 and portals.size() == 1:
 		# Второй портал в средней части
 		var x = randi() % 5 + 4  # 4-8
@@ -264,7 +265,9 @@ func _spawn_enemy(type: String, portal):
 	enemies.append(enemy)
 
 	# Подключаем сигналы
+	# warning-ignore:return_value_discarded
 	enemy.connect("reached_end", self, "_on_enemy_reached_end")
+	# warning-ignore:return_value_discarded
 	enemy.connect("died", self, "_on_enemy_died")
 
 func _on_enemy_reached_end(enemy):

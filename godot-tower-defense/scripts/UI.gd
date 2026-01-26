@@ -27,12 +27,18 @@ func _ready():
 	tower_buttons = [basic_button, sniper_button, cannon_button, freeze_button]
 
 	# Подключаем кнопки
+	# warning-ignore:return_value_discarded
 	basic_button.connect("pressed", self, "_on_tower_button_pressed", ["basic"])
+	# warning-ignore:return_value_discarded
 	sniper_button.connect("pressed", self, "_on_tower_button_pressed", ["sniper"])
+	# warning-ignore:return_value_discarded
 	cannon_button.connect("pressed", self, "_on_tower_button_pressed", ["cannon"])
+	# warning-ignore:return_value_discarded
 	freeze_button.connect("pressed", self, "_on_tower_button_pressed", ["freeze"])
 
+	# warning-ignore:return_value_discarded
 	start_wave_button.connect("pressed", self, "_on_start_wave_button_pressed")
+	# warning-ignore:return_value_discarded
 	sell_button.connect("pressed", self, "_on_sell_button_pressed")
 
 	# Устанавливаем версию
