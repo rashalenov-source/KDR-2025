@@ -21,13 +21,13 @@ func _build_danger_map() -> Dictionary:
 		if not is_instance_valid(tower):
 			continue
 
-		var tower_type_key = tower.tower_type if tower has "tower_type" else tower.get("tower_type", "basic")
+		var tower_type_key = tower.get("tower_type", "basic")
 		var tower_data = GameManager.TOWER_TYPES[tower_type_key]
 
 		# Получаем уровни улучшений
-		var damage_level = tower.damage_level if tower has "damage_level" else tower.get("damage_level", 1)
-		var range_level = tower.range_level if tower has "range_level" else tower.get("range_level", 1)
-		var speed_level = tower.speed_level if tower has "speed_level" else tower.get("speed_level", 1)
+		var damage_level = tower.get("damage_level", 1)
+		var range_level = tower.get("range_level", 1)
+		var speed_level = tower.get("speed_level", 1)
 
 		var range_value = tower_data.range * (1.0 + (range_level - 1) * 0.2)
 		var damage = tower_data.damage * (1.0 + (damage_level - 1) * 0.3)
@@ -40,7 +40,7 @@ func _build_danger_map() -> Dictionary:
 		var range_in_cells = ceil(range_value / GameManager.GRID_SIZE)
 		var effective_range = range_value
 
-		var tower_grid_pos = tower.grid_pos if tower has "grid_pos" else tower.get("grid_pos", Vector2.ZERO)
+		var tower_grid_pos = tower.get("grid_pos", Vector2.ZERO)
 
 		for dx in range(-range_in_cells, range_in_cells + 1):
 			for dy in range(-range_in_cells, range_in_cells + 1):
