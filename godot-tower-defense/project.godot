@@ -9,7 +9,6 @@ config_version=4
 config/name="Tower Defense - Godot Edition"
 config/description="Tower Defense game ported from JavaScript to Godot"
 run/main_scene="res://scenes/Main.tscn"
-config/icon="res://icon.png"
 
 [display]
 
