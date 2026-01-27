@@ -33,12 +33,9 @@ func _ready():
 	pathfinder.initialize(GameManager.GRID_COLS, GameManager.GRID_ROWS, towers)
 
 	# Подключение UI
-	# warning-ignore:return_value_discarded
-	$UI.connect("tower_selected", self, "_on_tower_type_selected")
-	# warning-ignore:return_value_discarded
-	$UI.connect("start_wave_pressed", self, "_on_start_wave_pressed")
-	# warning-ignore:return_value_discarded
-	$UI.connect("sell_tower_pressed", self, "_on_sell_tower_pressed")
+	var _unused = $UI.connect("tower_selected", self, "_on_tower_type_selected")
+	_unused = $UI.connect("start_wave_pressed", self, "_on_start_wave_pressed")
+	_unused = $UI.connect("sell_tower_pressed", self, "_on_sell_tower_pressed")
 
 	print("Main scene ready!")
 
@@ -252,7 +249,7 @@ func _spawn_wave_enemies():
 	# Спавн обычных врагов
 	var enemy_index = 0
 	for enemy_group in wave_data.enemies:
-		for i in range(enemy_group.count):
+		for _i in range(enemy_group.count):
 			yield(get_tree().create_timer(0.3 * enemy_index), "timeout")
 			_spawn_enemy(enemy_group.type, portals[enemy_index % portals.size()])
 			enemy_index += 1
@@ -265,10 +262,8 @@ func _spawn_enemy(type: String, portal):
 	enemies.append(enemy)
 
 	# Подключаем сигналы
-	# warning-ignore:return_value_discarded
-	enemy.connect("reached_end", self, "_on_enemy_reached_end")
-	# warning-ignore:return_value_discarded
-	enemy.connect("died", self, "_on_enemy_died")
+	var _unused = enemy.connect("reached_end", self, "_on_enemy_reached_end")
+	_unused = enemy.connect("died", self, "_on_enemy_died")
 
 func _on_enemy_reached_end(enemy):
 	GameManager.lives -= 1

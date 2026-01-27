@@ -59,7 +59,7 @@ func _generate_circle_line(radius: float, segments: int) -> PoolVector2Array:
 
 	return points
 
-func _process(delta):
+func _process(_delta):
 	if GameManager.game_over:
 		return
 

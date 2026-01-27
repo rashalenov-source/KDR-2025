@@ -12,15 +12,14 @@ onready var animation_timer = $AnimationTimer
 var particle_circles = []
 
 func _ready():
-	# warning-ignore:return_value_discarded
-	animation_timer.connect("timeout", self, "_on_animation_tick")
+	var _unused = animation_timer.connect("timeout", self, "_on_animation_tick")
 	_create_particle_circles()
 	animation_timer.start()  # Запускаем таймер вручную после инициализации
 	_update_portal_visuals()  # Начальная отрисовка
 
 func _create_particle_circles():
 	# Создаем 8 вращающихся частиц
-	for i in range(8):
+	for _i in range(8):
 		var particle = Polygon2D.new()
 		var circle_points = _generate_circle(3, 8)  # радиус 3, 8 сегментов
 		particle.polygon = circle_points
